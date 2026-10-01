@@ -1,0 +1,26 @@
+/**
+ * `jsails hello` command.
+ *
+ * A readable sample of the Laravel-Zero-style command kit. The optional `name`
+ * argument is read from the command line; when it is absent the command prompts
+ * for it interactively through the injected `node:readline/promises` prompter.
+ */
+
+import { defineCommand } from '../app/application-command.js';
+
+export default defineCommand({
+  signature: 'hello {name?}',
+  summary: 'Greet someone by name',
+  audience: 'user',
+  async run(input, ctx) {
+    let name = input.arguments['name'];
+    if (name === undefined) {
+      name = await ctx.prompter.text('What is your name?');
+    }
+    if (name === '') {
+      name = 'world';
+    }
+    ctx.stdout(`Hello, ${name}!`);
+    return 0;
+  },
+});

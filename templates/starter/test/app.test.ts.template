@@ -1,0 +1,86 @@
+/**
+ * In-process server tests for the generated starter.
+ *
+ * `createTestApp` assembles the real application over the same Hono pipeline
+ * `serve` uses and routes requests in-process: no HTTP server listens, no
+ * broadcast is attached, no browser is involved, and no external service is
+ * required. Pages render through the built-in Preact renderer, so the server
+ * HTML is the real output.
+ *
+ * Scope: these tests assert server behavior only. The counter's clicks and
+ * hydration are browser concerns and are covered by the Playwright suite in
+ * `test/browser/` (run with `npm run test:browser`), never here.
+ *
+ * `lifecycle: t` registers the app's teardown on the `node:test` context, so
+ * each app closes automatically when its test finishes.
+ */
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { createTestApp } from '../app/application-testing.js';
+
+test('home page is served as HTML with server-rendered counter markup', { timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ lifecycle: t });
+
+  const response = await app.request('/');
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /text\/html/);
+
+  const html = await response.text();
+  assert.match(html, /<title>JSails Starter<\/title>/);
+  assert.match(html, /id="counter-root"/);
+  // The counter is server-rendered at its deterministic initial value. This
+  // proves the SSR markup only; it does not exercise clicks or hydration.
+  assert.match(html, /data-counter-value[^>]*>\s*0\s*</);
+  assert.match(html, /data-counter-increment/);
+});
+
+test('about page is served as HTML with a static heading and back link', { timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ lifecycle: t });
+
+  const response = await app.request('/about');
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /text\/html/);
+
+  const html = await response.text();
+  assert.match(html, /<title>About — JSails Starter<\/title>/);
+  assert.match(html, /<h1[^>]*>About<\/h1>/);
+  // The back link points at the home page; navigation itself is a browser concern.
+  assert.match(html, /href="\/"/);
+});
+
+test('tasks page renders the live server component with snapshot markers', { timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ lifecycle: t });
+
+  const response = await app.request('/tasks');
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /text\/html/);
+
+  const html = await response.text();
+  assert.match(html, /<title>Tasks — JSails Starter<\/title>/);
+  // The signed, live component root (not the static fallback) carries a snapshot
+  // and a CSRF token, plus the stable form markers the browser binding reads.
+  assert.match(html, /data-jsails-component="task-list"/);
+  assert.match(html, /data-jsails-component-snapshot="[^"]+"/);
+  assert.match(html, /data-jsails-component-csrf="[^"]+"/);
+  assert.match(html, /data-task-input/);
+  assert.match(html, /data-task-submit/);
+  // The counter island is mounted outside the component root.
+  assert.match(html, /id="counter-root"/);
+  assert.match(html, /data-jsails-island="counter"/);
+  // A fresh list renders the empty state, never the static-export notice.
+  assert.match(html, /No tasks yet\./);
+  assert.doesNotMatch(html, /not available in the static export/);
+});
+
+test('unknown routes return a JSON 404', { timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ lifecycle: t });
+
+  const response = await app.request('/does-not-exist');
+  assert.equal(response.status, 404);
+  assert.match(response.headers.get('content-type') ?? '', /application\/json/);
+
+  const body = (await response.json()) as { error?: { code?: string } };
+  assert.equal(body.error?.code, 'not_found');
+});

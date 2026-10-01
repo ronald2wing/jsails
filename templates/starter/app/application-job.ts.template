@@ -1,0 +1,9 @@
+/**
+ * Project-local job definition surface.
+ *
+ * Thin re-export of the framework's `defineJob`. Job definitions import it from
+ * `../app/application-job.js` instead of the root `jsails` entry, so the
+ * `jsails` import lives in this one shim.
+ */
+
+export { defineJob } from 'jsails';

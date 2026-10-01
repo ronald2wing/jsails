@@ -1,0 +1,9 @@
+/**
+ * Project-local admin resource surface.
+ *
+ * Thin re-export of the admin panel's `defineResource`. Resource definitions
+ * import it from `../app/application-resource.js` instead of `jsails/admin`, so
+ * the `jsails` import lives in this one shim.
+ */
+
+export { defineResource } from 'jsails/admin';

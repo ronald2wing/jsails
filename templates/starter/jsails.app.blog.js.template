@@ -1,0 +1,111 @@
+import { JsailsDataSource, readDatabaseEnvironment } from 'jsails';
+import { defineAdminPanel } from 'jsails/admin';
+import {
+  blogPostEntities,
+  blogAdmin,
+  createDatabaseBlogStore,
+} from 'jsails/blog';
+import { pluginManagerPlugin } from 'jsails/plugin-manager';
+import {
+  authSessionToken,
+  createAuth,
+  resolveSessionFromRequest,
+} from 'jsails/auth';
+import { createLocalDisk } from 'jsails/filesystem';
+
+import { components } from './dist/app/registry.js';
+
+// Auth is the first-party `auth` plugin (`jsails/auth`): it lazily builds a
+// Better Auth instance (email/password + RFC 8628 device authorization) over
+// MariaDB and mounts the `/api/auth/*`, `/api/login`, `/api/logout`, and
+// `/api/device/approve|deny` routes as trusted hook routes. Importing this
+// config reads no environment variable and opens no database connection — the
+// first live request (or an auth script) builds the instance. The secret comes
+// from BETTER_AUTH_SECRET (or AUTH_SECRET); Better Auth fails in production
+// without one, and JSails does not invent a fallback. See `.env.auth.example`
+// for the variables (JSails never auto-loads `.env`).
+
+// Optional public origin for the login/logout same-origin checks. Behind a
+// TLS-terminating proxy the request URL is plain HTTP, so set PUBLIC_ORIGIN to
+// the public HTTPS origin; when unset the handlers fall back to each request's
+// own origin.
+const publicOrigin = process.env.PUBLIC_ORIGIN;
+
+// One shared, database-backed blog store backs both the `blog` plugin's HTTP
+// routes (`GET /blog`, `POST /blog/posts`) and the `blog` admin resource. The
+// data source is resolved lazily — reading DATABASE_* and constructing (but not
+// connecting) the source only on the first query — so importing this config,
+// running `jsails build` (static export), and rendering the SSG blog pages
+// never open a database connection. The `jsails_blog_post` table must already
+// exist: run `npm run db:migrate` first.
+const blogStore = createDatabaseBlogStore({
+  getDataSource: () =>
+    new JsailsDataSource({ ...readDatabaseEnvironment(), entities: blogPostEntities }),
+});
+
+// The admin panel: a dashboard mounted at `/admin`. It consumes the auth
+// plugin's session service (so the `auth` plugin must be declared first),
+// and its `authorize` is default-deny — here it allows any signed-in session,
+// but production should restrict this to an admin role/claim. The
+// `plugin-manager` admin plugin adds the plugin install/enable surface, and the
+// `blog` admin plugin adds the post CRUD resource over the shared store.
+const admin = defineAdminPanel({
+  auth: authSessionToken,
+  authorize: (session) => session !== null,
+  adminPlugins: [pluginManagerPlugin(), blogAdmin({ store: blogStore })],
+});
+
+export default {
+  rootDir: '.',
+  pages: 'dist/pages',
+  api: 'dist/api',
+  public: 'public',
+  out: 'out',
+  host: '127.0.0.1',
+  port: Number(process.env.PORT ?? 3000),
+  // Consulted only for the login/logout same-origin checks (and any future
+  // authenticated mutations). `undefined` keeps the request-origin fallback.
+  publicOrigin,
+  // Global API authorization: default-deny. Only a request with a session is
+  // allowed; `/api/me` is the protected filesystem API, while login/logout are
+  // trusted hook routes that never pass through this check.
+  authorize: (context) => context.session !== null,
+  // Trusted session seam: derive the JSails session from the Better Auth cookie.
+  // This resolves a memoized instance via `createAuth()`, distinct from the one
+  // the `auth` plugin builds in its own `setup`; both read the same environment
+  // and database, so sessions resolve identically.
+  resolveSession: (request) => resolveSessionFromRequest(createAuth(), request),
+  plugins: {
+    // Developer plugins declared via `plugins.use`: the loader resolves each
+    // specifier, imports it, and calls its default-export factory with the
+    // given options, producing the extension. Every plugin a specifier names
+    // automatically runs — developer plugins are never gated by `enabled`.
+    //
+    // `enabled` lists the marketplace/managed plugin ids shipped out of the
+    // box; `managed: true` persists installed-plugin state in the database
+    // (`jsails_plugin_state` table): add `pluginStateEntities` to your
+    // `JsailsDataSource` `entities` and run `jsails makemigrations` / `jsails
+    // migrate` to create the table. `enabled` controls admin-installed plugins
+    // only — the `use` entries above always run regardless of `enabled`.
+    use: [
+      // The `plugin-tools` plugin exposes the canonical shared tool modules
+      // (cleanup, zod, trusted-mutation, responses) under a typed service token
+      // for plugin authors. It runs before every default plugin.
+      'jsails/plugin-tools',
+      ['jsails/auth', { publicOrigin }],
+      'jsails/cache',
+      ['jsails/filesystem', { disks: { local: createLocalDisk({ root: 'storage/files' }) }, default: 'local' }],
+      ['jsails/mail', { allowMemory: process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' }],
+      // The blog plugin provides the post store service and the live list/create
+      // HTTP surface; the database connection is owned by the store above.
+      ['jsails/blog', { store: blogStore }],
+      ['jsails/admin', admin],
+      // No signing key is hardcoded. In development/test the extension mints an
+      // ephemeral key; a plain `jsails serve` outside those environments requires
+      // JSAILS_COMPONENT_SECRET (>= 32 bytes) or the live render fails closed.
+      ['jsails/server-components', { components }],
+    ],
+    enabled: ['plugin-tools', 'auth', 'admin', 'blog', 'cache', 'filesystem', 'mail', 'server-components'],
+    managed: true,
+  },
+};

@@ -1,0 +1,28 @@
+/**
+ * `jsails login` command.
+ *
+ * Starts the OAuth 2.0 device flow: requests a device code, prints the user
+ * code and approval URL, opens the browser (unless `--no-open`), and polls
+ * until the user approves. On success the session credentials are stored; on
+ * failure the error goes to stderr and the command exits nonzero. The session
+ * token is never printed.
+ */
+
+import { defineCommand } from '../app/application-command.js';
+
+import { login } from '../app/application-auth.js';
+
+export default defineCommand({
+  signature: 'login {--no-open}',
+  summary: 'Sign in from the CLI via a browser approval page',
+  audience: 'user',
+  async run(input, ctx) {
+    try {
+      await login({ openBrowser: input.options['no-open'] !== true });
+      return 0;
+    } catch (error) {
+      ctx.stderr(error instanceof Error ? error.message : 'login failed');
+      return 1;
+    }
+  },
+});

@@ -1,0 +1,259 @@
+{
+  "name": "jsails",
+  "version": "1.0.0",
+  "private": false,
+  "description": "TypeScript application framework: Active Record ORM with history migrations, filesystem pages and APIs, server components with soft navigation, plugins with an admin panel, and Jamal local/deploy tooling.",
+  "license": "MIT",
+  "keywords": [
+    "typescript",
+    "framework",
+    "active-record",
+    "orm",
+    "migrations",
+    "ssr",
+    "server-components",
+    "static-export",
+    "plugins",
+    "admin",
+    "cli",
+    "deploy",
+    "preact",
+    "hono"
+  ],
+  "homepage": "https://github.com/ronald2wing/jsails",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ronald2wing/jsails.git"
+  },
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./admin": {
+      "types": "./dist/src/admin/index.d.ts",
+      "import": "./dist/src/admin/index.js"
+    },
+    "./api": {
+      "types": "./dist/src/api/index.d.ts",
+      "import": "./dist/src/api/index.js"
+    },
+    "./app": {
+      "types": "./dist/src/app/index.d.ts",
+      "import": "./dist/src/app/index.js"
+    },
+    "./auth": {
+      "types": "./dist/src/auth/index.d.ts",
+      "import": "./dist/src/auth/index.js"
+    },
+    "./blog": {
+      "types": "./dist/src/blog/index.d.ts",
+      "import": "./dist/src/blog/index.js"
+    },
+    "./broadcast": {
+      "types": "./dist/src/broadcast/index.d.ts",
+      "import": "./dist/src/broadcast/index.js"
+    },
+    "./broadcast/client": {
+      "types": "./dist/src/broadcast/client.d.ts",
+      "import": "./dist/src/broadcast/client.js"
+    },
+    "./cache": {
+      "types": "./dist/src/cache/index.d.ts",
+      "import": "./dist/src/cache/index.js"
+    },
+    "./client": {
+      "types": "./dist/src/client/index.d.ts",
+      "import": "./dist/src/client/index.js"
+    },
+    "./plugin-tools": {
+      "types": "./dist/src/plugin-tools/index.d.ts",
+      "import": "./dist/src/plugin-tools/index.js"
+    },
+    "./database": {
+      "types": "./dist/src/database/index.d.ts",
+      "import": "./dist/src/database/index.js"
+    },
+    "./deploy": {
+      "types": "./dist/src/deploy/index.d.ts",
+      "import": "./dist/src/deploy/index.js"
+    },
+    "./diagnostics": {
+      "types": "./dist/src/diagnostics/index.d.ts",
+      "import": "./dist/src/diagnostics/index.js"
+    },
+    "./encryption": {
+      "types": "./dist/src/encryption/index.d.ts",
+      "import": "./dist/src/encryption/index.js"
+    },
+    "./extensions": {
+      "types": "./dist/src/extensions/index.d.ts",
+      "import": "./dist/src/extensions/index.js"
+    },
+    "./filesystem": {
+      "types": "./dist/src/filesystem/index.d.ts",
+      "import": "./dist/src/filesystem/index.js"
+    },
+    "./flags": {
+      "types": "./dist/src/flags/index.d.ts",
+      "import": "./dist/src/flags/index.js"
+    },
+    "./http": {
+      "types": "./dist/src/http/index.d.ts",
+      "import": "./dist/src/http/index.js"
+    },
+    "./i18n": {
+      "types": "./dist/src/i18n/index.d.ts",
+      "import": "./dist/src/i18n/index.js"
+    },
+    "./logging": {
+      "types": "./dist/src/logging/index.d.ts",
+      "import": "./dist/src/logging/index.js"
+    },
+    "./signals": {
+      "types": "./dist/src/signals/index.d.ts",
+      "import": "./dist/src/signals/index.js"
+    },
+    "./inertia": {
+      "types": "./dist/src/inertia/index.d.ts",
+      "import": "./dist/src/inertia/index.js"
+    },
+    "./introspect": {
+      "types": "./dist/src/introspect/index.d.ts",
+      "import": "./dist/src/introspect/index.js"
+    },
+    "./jamal": {
+      "types": "./dist/src/jamal/index.d.ts",
+      "import": "./dist/src/jamal/index.js"
+    },
+    "./jobs": {
+      "types": "./dist/src/jobs/index.d.ts",
+      "import": "./dist/src/jobs/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/src/jsx/jsx-runtime.d.ts",
+      "import": "./dist/src/jsx/jsx-runtime.js"
+    },
+    "./mail": {
+      "types": "./dist/src/mail/index.d.ts",
+      "import": "./dist/src/mail/index.js"
+    },
+    "./notifications": {
+      "types": "./dist/src/notifications/index.d.ts",
+      "import": "./dist/src/notifications/index.js"
+    },
+    "./pages": {
+      "types": "./dist/src/pages/index.d.ts",
+      "import": "./dist/src/pages/index.js"
+    },
+    "./plugin-manager": {
+      "types": "./dist/src/plugin-manager/index.d.ts",
+      "import": "./dist/src/plugin-manager/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/src/plugins/index.d.ts",
+      "import": "./dist/src/plugins/index.js"
+    },
+    "./render-to-string": {
+      "types": "./dist/src/jsx/render-to-string.d.ts",
+      "import": "./dist/src/jsx/render-to-string.js"
+    },
+    "./routing": {
+      "types": "./dist/src/routing/index.d.ts",
+      "import": "./dist/src/routing/index.js"
+    },
+    "./server-components": {
+      "types": "./dist/src/server-components/index.d.ts",
+      "import": "./dist/src/server-components/index.js"
+    },
+    "./sessions": {
+      "types": "./dist/src/sessions/index.d.ts",
+      "import": "./dist/src/sessions/index.js"
+    },
+    "./testing": {
+      "types": "./dist/src/testing/index.d.ts",
+      "import": "./dist/src/testing/index.js"
+    },
+    "./theme": {
+      "types": "./dist/src/theme/index.d.ts",
+      "import": "./dist/src/theme/index.js"
+    },
+    "./validation": {
+      "types": "./dist/src/validation/index.d.ts",
+      "import": "./dist/src/validation/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "templates/starter",
+    "templates/starter-cli",
+    "AGENTS.md"
+  ],
+  "bin": {
+    "jsails": "./dist/src/cli.js",
+    "create-jsails": "./dist/src/cli/create-jsails.js"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "prepublishOnly": "npm run check",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build && node scripts/run-tests.mjs",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "build:watch": "tsc -p tsconfig.json --watch",
+    "typecheck:watch": "tsc -p tsconfig.json --noEmit --watch",
+    "pretest:watch": "tsc -p tsconfig.json",
+    "test:watch": "node scripts/run-tests.mjs --watch",
+    "test:coverage": "npm run build && node scripts/run-tests.mjs --experimental-test-coverage",
+    "verify:starter": "node scripts/verify-starter.mjs",
+    "verify:integrations": "node scripts/verify-integrations.mjs",
+    "website": "npm run build && npm --prefix website run build"
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.11.0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.3",
+    "@hotwired/turbo": "^8.0.23",
+    "@preact/preset-vite": "^2.10.6",
+    "@preact/signals": "^2.11.3",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "better-auth": "^1.7.7",
+    "bullmq": "^6.3.11",
+    "hono": "^4.13.12",
+    "ioredis": "^5.11.1",
+    "kysely": "^0.29.6",
+    "mysql2": "^3.24.5",
+    "nodemailer": "^10.0.14",
+    "nodemon": "^3.1.14",
+    "pg": "^8.23.1",
+    "preact": "^11.0.0",
+    "preact-render-to-string": "^6.8.0",
+    "reflect-metadata": "^0.2.2",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4",
+    "sql.js": "^1.14.2",
+    "typeorm": "^1.1.1",
+    "vite": "^8.3.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/hotwired__turbo": "^8.0.16",
+    "@types/node": "^26.6.3",
+    "@types/nodemailer": "^8.0.2",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "playwright-core": "^1.63.0",
+    "prettier": "^3.9.9",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.71.0"
+  }
+}

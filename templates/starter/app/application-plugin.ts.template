@@ -1,0 +1,9 @@
+/**
+ * Project-local plugin authoring surface.
+ *
+ * Thin re-export of the framework's `definePlugin` from the ORM-free
+ * `jsails/extensions` entry, so plugin code never pulls in TypeORM through this
+ * shim. Plugin definitions import it from `../app/application-plugin.js`.
+ */
+
+export { definePlugin } from 'jsails/extensions';

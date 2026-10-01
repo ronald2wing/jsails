@@ -1,0 +1,35 @@
+// Apply the Better Auth schema migrations to the configured MariaDB database.
+//
+// Usage: node scripts/auth-migrate.mjs
+//
+// This script uses the same environment variables the app does
+// (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`,
+// `DATABASE_NAME`, `BETTER_AUTH_SECRET`/`AUTH_SECRET`, `BETTER_AUTH_URL`), so
+// run it with the same environment the app will use. `getAuthMigrations` comes
+// from the framework's first-party `auth` plugin (`jsails/auth`), not compiled
+// app output, so no build is required first.
+import { getAuthMigrations } from 'jsails/auth';
+
+console.log('Computing Better Auth schema migrations...');
+const migrations = await getAuthMigrations();
+
+for (const table of migrations.toBeCreated) {
+  console.log(`  create table ${table.table}`);
+}
+for (const table of migrations.toBeAdded) {
+  console.log(`  alter table ${table.table}`);
+}
+for (const index of migrations.toBeAddedIndexes) {
+  console.log(`  add index ${index.name} on ${index.table}`);
+}
+
+for (const problem of migrations.schemaProblems) {
+  console.warn(`  schema problem: ${problem}`);
+}
+for (const unsafe of migrations.unsafeChanges) {
+  console.warn(`  unsafe change: ${unsafe}`);
+}
+
+await migrations.runMigrations();
+
+console.log('Migrations applied.');

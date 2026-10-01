@@ -1,0 +1,9 @@
+/**
+ * Project-local server-component authoring surface.
+ *
+ * Thin re-export of the framework's component authoring helpers. Component
+ * definitions import these from `../app/application-component.js` instead of
+ * `jsails/server-components`, so the `jsails` import lives in this one shim.
+ */
+
+export { defineAction, defineServerComponent } from 'jsails/server-components';

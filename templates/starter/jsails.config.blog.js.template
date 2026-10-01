@@ -1,0 +1,30 @@
+// jsails.config.js — the migration / data-source config for the JSails
+// migration CLI (`makemigrations`, `migrate`, `showmigrations`). It must be a
+// compiled JavaScript module (a `.ts` path is rejected) whose default export is
+// a `JsailsDataSource` instance.
+//
+// This module is imported only by the migration commands — never by
+// `jsails build`/`serve`/`dev` (those import `jsails.app.js`).
+// `readDatabaseEnvironment` resolves the connection settings here, so a missing
+// `DATABASE_*` variable fails fast before any migration runs; JSails never
+// loads a `.env` file. Run `npm run db:migrate` to generate and apply the
+// history for the tables below.
+//
+// The framework-owned tables shipped here are the session table
+// (`sessionEntities` → `jsails_session`), the plugin-state table
+// (`pluginStateEntities` → `jsails_plugin_state`, required by
+// `plugins.managed: true` in `jsails.app.js`), and the blog post table
+// (`blogPostEntities` → `jsails_blog_post`, backing the first-party blog).
+// Add your own entities (for example a `User` EntitySchema) to the list.
+import {
+  JsailsDataSource,
+  pluginStateEntities,
+  readDatabaseEnvironment,
+  sessionEntities,
+} from 'jsails';
+import { blogPostEntities } from 'jsails/blog';
+
+export default new JsailsDataSource({
+  ...readDatabaseEnvironment(),
+  entities: [...sessionEntities, ...pluginStateEntities, ...blogPostEntities],
+});

@@ -1,0 +1,24 @@
+/**
+ * JSails static-site app config.
+ *
+ * A static export has no server runtime: `jsails build` renders every page to
+ * HTML, copies `public/` byte-for-byte, and writes the result into `out/`. The
+ * generated site is plain files — deploy `out/` to any static host.
+ *
+ * `plugins.use` is empty: a static site ships no server plugins. The loader
+ * still resolves any specifier you add here (for example a build-time plugin
+ * that contributes pages), and any plugin listed in `package.json` is available
+ * to import. There is no `plugins.enabled`/`managed` block because a static
+ * export never runs the marketplace or opens a database.
+ */
+export default {
+  rootDir: '.',
+  pages: 'dist/pages',
+  public: 'public',
+  out: 'out',
+  host: '127.0.0.1',
+  port: Number(process.env.PORT ?? 3000),
+  plugins: {
+    use: [],
+  },
+};

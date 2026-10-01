@@ -1,0 +1,95 @@
+/**
+ * Playwright configuration for the generated starter's browser tests.
+ *
+ * The `test:browser` npm script builds the app before invoking Playwright; this
+ * config only starts the already-built server and points the tests at it. It
+ * never builds, installs, or downloads anything.
+ *
+ * Environment:
+ * - `JSAILS_TEST_PORT` — TCP port for the test server. Defaults to 4173.
+ * - `JSAILS_BROWSER_PATH` — optional path to a browser executable. When unset,
+ *   Playwright uses its managed browser, which must be installed explicitly with
+ *   `npx playwright install`; nothing is downloaded automatically.
+ * - `JSAILS_TRACE` — set to `1` to retain a trace when a test fails; tracing is
+ *   off otherwise.
+ * - `NODE_ENV` — forwarded to the child server unchanged; defaulted to `test`
+ *   only when unset, so the server-components extension mints its ephemeral test
+ *   key instead of failing a live render closed.
+ *
+ * Artifacts (`test-results/`, `playwright-report/`) are local and confidential:
+ * screenshots and traces are captured only on failure and may contain test data.
+ */
+
+import { existsSync } from 'node:fs';
+
+import { defineConfig } from '@playwright/test';
+
+/** Port used when `JSAILS_TEST_PORT` is unset. */
+const DEFAULT_PORT = 4173;
+
+/** Parse and validate `JSAILS_TEST_PORT`, failing loudly on bad input. */
+function resolveTestPort(raw: string | undefined): number {
+  const value = raw?.trim() ?? '';
+  if (value === '') return DEFAULT_PORT;
+  if (!/^\d+$/.test(value)) {
+    throw new Error('JSAILS_TEST_PORT must be an integer between 1 and 65535');
+  }
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('JSAILS_TEST_PORT must be an integer between 1 and 65535');
+  }
+  return port;
+}
+
+const port = resolveTestPort(process.env.JSAILS_TEST_PORT);
+const origin = `http://127.0.0.1:${port}`;
+
+const browserPath = process.env.JSAILS_BROWSER_PATH?.trim();
+if (browserPath !== undefined && browserPath !== '' && !existsSync(browserPath)) {
+  throw new Error(
+    'JSAILS_BROWSER_PATH does not point to an existing file; unset it to use the Playwright-managed browser.',
+  );
+}
+const launchOptions = browserPath !== undefined && browserPath !== ''
+  ? { executablePath: browserPath }
+  : undefined;
+
+/** Start from the parent environment, dropping entries that are unset. */
+const serverEnv: Record<string, string> = {};
+for (const [key, value] of Object.entries(process.env)) {
+  if (value !== undefined) serverEnv[key] = value;
+}
+serverEnv.PORT = String(port);
+// Default the child server's NODE_ENV to `test` only when the caller left it
+// unset, so the server-components extension can mint its ephemeral test key. A
+// caller-set NODE_ENV (e.g. production) is preserved verbatim — never overridden.
+if (serverEnv.NODE_ENV === undefined) {
+  serverEnv.NODE_ENV = 'test';
+}
+
+export default defineConfig({
+  testDir: './test/browser',
+  outputDir: 'test-results',
+  fullyParallel: false,
+  workers: 1,
+  retries: 0,
+  reporter: [
+    ['list'],
+    ['json', { outputFile: 'test-results/results.json' }],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+  ],
+  use: {
+    baseURL: origin,
+    screenshot: 'only-on-failure',
+    video: 'off',
+    trace: process.env.JSAILS_TRACE === '1' ? 'retain-on-failure' : 'off',
+    launchOptions,
+  },
+  webServer: {
+    command: 'npm run serve',
+    url: origin,
+    env: serverEnv,
+    reuseExistingServer: false,
+    gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
+  },
+});

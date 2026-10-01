@@ -1,0 +1,12 @@
+dist
+node_modules
+coverage
+test-results
+playwright-report
+out
+.content-cache
+**/public/assets
+package-lock.json
+*.template
+templates/**/*.template
+*.md

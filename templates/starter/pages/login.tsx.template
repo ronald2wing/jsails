@@ -1,0 +1,101 @@
+/**
+ * Starter login page.
+ *
+ * A plain, server-rendered form that posts credentials to the `/api/login`
+ * route. There is no client SDK and no JavaScript here: the browser's native
+ * form submission sends `email`/`password` as URL-encoded form data, and the
+ * route (server-side Better Auth) verifies them and redirects. On failure the
+ * route redirects back to `/login?error=1`, which this page's `load` reads to
+ * render the generic "Invalid email or password." alert.
+ *
+ * The credentials are ordinary form fields. They are never placed in a
+ * snapshot, a data attribute, or the client bundle — only the route sees the
+ * password.
+ */
+
+import type { RequestContext } from 'jsails';
+
+import { Field } from '../ui/components.js';
+import { Layout, loadLayout, type LayoutAssets } from '../ui/layout.js';
+
+export interface LoginPageProps {
+  /** True when the previous attempt failed (the route redirected to `?error=1`). */
+  error: boolean;
+  /**
+   * The post-login redirect target the route forwards on success, when the
+   * page was reached with a `?next=` (e.g. from the device-approval page). It
+   * is echoed back as a hidden field so a failed attempt preserves it.
+   */
+  next?: string;
+  /** Resolved asset URLs, produced in `load` and forwarded to the layout. */
+  assets?: LayoutAssets;
+}
+
+export async function load(context: RequestContext): Promise<LoginPageProps> {
+  return {
+    assets: await loadLayout(context),
+    error: context.url.searchParams.get('error') === '1',
+    next: context.url.searchParams.get('next') ?? undefined,
+  };
+}
+
+export default function LoginPage({ error, next, assets }: LoginPageProps) {
+  return (
+    <Layout title="Sign in — JSails Starter" assets={assets}>
+      <header class="text-center">
+        <h1 class="text-4xl font-bold tracking-tight">Sign in</h1>
+        <p class="mt-2 text-base-content/70">
+          Sign in with a local account. The form posts to the server; no client
+          SDK runs.
+        </p>
+      </header>
+
+      <section class="card w-full bg-base-100 shadow-xl">
+        <div class="card-body">
+          {error ? (
+            <p class="alert alert-error" role="alert">
+              Invalid email or password.
+            </p>
+          ) : null}
+
+          <form method="post" action="/api/login" class="flex w-full flex-col gap-4">
+            {next ? <input type="hidden" name="next" value={next} /> : null}
+            <Field id="email" label="Email">
+              <input
+                id="email"
+                type="email"
+                name="email"
+                class="input input-bordered w-full"
+                autocomplete="email"
+                required
+              />
+            </Field>
+            <Field id="password" label="Password">
+              <input
+                id="password"
+                type="password"
+                name="password"
+                class="input input-bordered w-full"
+                autocomplete="current-password"
+                required
+              />
+            </Field>
+            <div class="card-actions justify-between">
+              <a class="btn btn-ghost" href="/">
+                Back home
+              </a>
+              <button type="submit" class="btn btn-primary">
+                Sign in
+              </button>
+            </div>
+          </form>
+
+          <div class="divider">or</div>
+          <a class="btn btn-outline" href="/device">
+            Sign in from a device
+          </a>
+        </div>
+      </section>
+    </Layout>
+  );
+}

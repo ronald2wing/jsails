@@ -1,0 +1,20 @@
+/**
+ * Project-local component and job registry consumed by the app config.
+ *
+ * This module is the single place the generated `jsails.app.js` reaches into
+ * application code: it imports each registered server component and collects
+ * them into the map the framework extension expects, so component wiring lives
+ * here rather than in the config. Add `defineJob(...)` entries to `jobs` (and
+ * import them from `../app/application-job.js`) when the app grows background
+ * work; the starter config does not consume `jobs` yet.
+ */
+
+import { taskList } from '../components/task-list.js';
+
+/** Server components, keyed by their registered name. */
+export const components = {
+  'task-list': taskList,
+};
+
+/** Job definitions, keyed by name. Empty (registry-ready) until jobs are added. */
+export const jobs = {};

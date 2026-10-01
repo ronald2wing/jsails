@@ -1,0 +1,36 @@
+// Create the framework-owned database tables (sessions, plugin state, and — for
+// the blog starter — blog posts) by generating and applying the JSails migration
+// history.
+//
+// Usage: node scripts/db-migrate.mjs
+//
+// This script runs `jsails makemigrations` (diff the model metadata against the
+// recorded history, offline) and then `jsails migrate` (apply the history to the
+// configured MariaDB database). It uses the same `DATABASE_*` environment
+// variables the app does, so run it with the same environment the app will use;
+// JSails never loads a `.env` file. Re-running it is a no-op once the history is
+// recorded and applied.
+import { spawnSync } from 'node:child_process';
+
+const config = 'jsails.config.js';
+const name = 'add_framework_tables';
+const bin = process.platform === 'win32' ? 'jsails.cmd' : 'jsails';
+
+function run(args) {
+  const result = spawnSync(bin, args, { stdio: 'inherit' });
+  if (result.error) {
+    console.error(`Failed to run ${bin}: ${result.error.message}`);
+    process.exit(1);
+  }
+  return result.status ?? 1;
+}
+
+console.log(`Generating the migration history (${name})...`);
+const generated = run(['makemigrations', '--name', name, '--config', config]);
+if (generated !== 0) {
+  process.exit(generated);
+}
+
+console.log('Applying the migration history...');
+const applied = run(['migrate', '--config', config]);
+process.exit(applied);

@@ -1,0 +1,27 @@
+{
+  "name": "jsails-static",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vite build && jsails build --config jsails.app.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "check": "npm run typecheck && npm run build",
+    "serve": "jsails serve --config jsails.app.js",
+    "export": "npm run build"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.3",
+    "jsails": "__JSAILS_DEPENDENCY__",
+    "preact": "^11.0.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.3",
+    "daisyui": "^5.7.47",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  }
+}

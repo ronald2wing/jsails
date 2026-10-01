@@ -1,0 +1,437 @@
+/**
+ * In-process auth tests for the generated starter.
+ *
+ * These exercise the login/logout flow end to end over the real HTTP pipeline.
+ * The global `authorize` is default-deny, so `/api/me` is rejected without a
+ * session. Login and logout are mounted as trusted extension hook routes in
+ * `jsails.app.js`, not filesystem API routes: they bypass the default-deny
+ * `authorize` and the session CSRF middleware, and each owns its own same-origin
+ * check. No port is opened and no browser is involved; Better Auth runs against
+ * the MariaDB database the environment points at.
+ *
+ * Auth now requires a database connection, so this suite needs a configured
+ * MariaDB. When `DATABASE_HOST` (and `DATABASE_NAME`/`DATABASE_USER`) is unset
+ * the whole suite is skipped, so a freshly generated app stays green without a
+ * database. When they are set, the suite runs against that database: the
+ * project-local auth shim is imported once, its migrations are run
+ * programmatically with `getAuthMigrations`, and one user is seeded with
+ * `signUpEmail`.
+ *
+ * The auth environment is resolved by the compiled app config, so
+ * `BETTER_AUTH_SECRET` is set at the top of this module BEFORE the auth shim is
+ * imported.
+ *
+ * Logout is a plain POST: the hook route requires only a same-origin `Origin`
+ * header (no `X-CSRF-Token`), so a form POST works even while the session cookie
+ * is present. A cross-origin `Origin` on login or logout is rejected with `403`
+ * and no session cookie is set.
+ *
+ * Device flow (RFC 8628): the same routes exercise the browser half of
+ * `jsails login` — request a device code, open the `/device` page (which claims
+ * the code for the signed-in user), approve or deny it, and redeem a session
+ * token at `/api/auth/device/token` that then authenticates `/api/me` through
+ * the bearer plugin. Each test requests its own code, so a code is polled at
+ * most once and never trips the plugin's `slow_down` interval.
+ *
+ * Security: passwords live in module constants only and are never logged,
+ * asserted against, or written into test output.
+ */
+
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { test } from 'node:test';
+
+import { createTestApp, type TestApplication } from '../app/application-testing.js';
+
+// ---------------------------------------------------------------------------
+// Database precondition — auth requires a configured MariaDB.
+// ---------------------------------------------------------------------------
+
+/**
+ * Connection variables the suite requires. When any is missing the whole suite
+ * is skipped rather than failing, so a generated app with no database stays
+ * green. The message names only the missing variables, never their values.
+ */
+const REQUIRED_DB_VARS = ['DATABASE_HOST', 'DATABASE_NAME', 'DATABASE_USER'] as const;
+
+const missingDbVars = REQUIRED_DB_VARS.filter((name) => {
+  const value = process.env[name];
+  return value === undefined || value === '';
+});
+
+const hasDatabase = missingDbVars.length === 0;
+
+/** Truthy skip reason (node:test `skip`), or `false` when the suite should run. */
+const skip = hasDatabase
+  ? false
+  : `auth tests skipped: requires a MariaDB database (missing ${missingDbVars.join(', ')})`;
+
+/** The seeded account. The password is only referenced here and never printed. */
+const USER = {
+  name: 'Test User',
+  email: 'user@example.com',
+  password: 'correct horse battery staple',
+} as const;
+
+// ---------------------------------------------------------------------------
+// Auth environment — set before the auth shim is imported.
+// ---------------------------------------------------------------------------
+
+// A fresh random signing secret for this run. Better Auth needs a secret of at
+// least 32 bytes; this value is per-run and is never the app's real secret.
+process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('base64url');
+
+if (hasDatabase) {
+  // The project-local auth shim is imported once; `createAuth()` is memoized, so
+  // the app config loaded by `createTestApp` shares this instance's database
+  // (though the config resolves its own memoized instance — both read the same
+  // environment and database).
+  const { createAuth, getAuthMigrations } = await import('../app/application-auth.js');
+  const auth = createAuth();
+
+  // Create the Better Auth tables in the configured database before any request
+  // touches them.
+  const { runMigrations } = await getAuthMigrations();
+  await runMigrations();
+
+  // Seed one account so the login route has something to verify against.
+  await auth.api.signUpEmail({
+    body: { email: USER.email, password: USER.password, name: USER.name },
+  });
+}
+
+/** A cross-origin value rejected by the login/logout same-origin checks. */
+const EVIL_ORIGIN = 'https://evil.example';
+
+test(
+  'sign in, read the protected session, and sign out',
+  { skip, timeout: 30_000 },
+  async (t) => {
+    const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+    // Without a session cookie, the protected endpoint is default-deny (403).
+    const denied = await app.request('/api/me');
+    assert.equal(denied.status, 403);
+    const deniedBody = (await denied.json()) as { error?: { code?: string } };
+    assert.equal(deniedBody.error?.code, 'forbidden');
+
+    // Correct credentials set a session cookie and redirect to /dashboard.
+    const login = await app.request('/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: app.origin },
+      body: new URLSearchParams({ email: USER.email, password: USER.password }).toString(),
+    });
+    assert.equal(login.status, 303);
+    const setCookie = login.headers.get('set-cookie');
+    assert.ok(setCookie, 'expected a Set-Cookie header on login');
+    await login.text(); // consume the body
+
+    // Keep only the `name=value` pair; the rest are cookie attributes.
+    const cookie = setCookie.split(';', 1)[0];
+
+    // The session cookie is accepted by the protected endpoint.
+    const me = await app.request('/api/me', { headers: { cookie } });
+    assert.equal(me.status, 200);
+    const meBody = (await me.json()) as { user?: { email?: string } };
+    assert.equal(meBody.user?.email, USER.email);
+
+    // Logout is a trusted hook route: it needs only a same-origin Origin (no
+    // X-CSRF-Token), so a plain form POST works while the session is present.
+    const logout = await app.request('/api/logout', {
+      method: 'POST',
+      headers: { cookie, origin: app.origin },
+    });
+    assert.equal(logout.status, 303);
+    await logout.text(); // consume the body
+
+    // Afterwards the same cookie is rejected: the session is gone.
+    const after = await app.request('/api/me', { headers: { cookie } });
+    assert.equal(after.status, 403);
+    const afterBody = (await after.json()) as { error?: { code?: string } };
+    assert.equal(afterBody.error?.code, 'forbidden');
+  },
+);
+
+test('wrong credentials redirect to /login?error=1', { skip, timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+  const login = await app.request('/api/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', origin: app.origin },
+    body: new URLSearchParams({ email: USER.email, password: 'not-the-password' }).toString(),
+  });
+  assert.equal(login.status, 303);
+  assert.match(login.headers.get('location') ?? '', /\/login\?error=1$/);
+  await login.text(); // consume the body
+});
+
+test(
+  'cross-origin login is rejected without setting a session',
+  { skip, timeout: 30_000 },
+  async (t) => {
+    const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+    const login = await app.request('/api/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        origin: EVIL_ORIGIN,
+      },
+      body: new URLSearchParams({ email: USER.email, password: USER.password }).toString(),
+    });
+    assert.equal(login.status, 403);
+    // The origin check rejects before Better Auth runs, so no session cookie is set.
+    assert.equal(login.headers.get('set-cookie'), null);
+    await login.text(); // consume the body
+  },
+);
+
+test('cross-origin logout is rejected', { skip, timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+  const logout = await app.request('/api/logout', {
+    method: 'POST',
+    headers: { origin: EVIL_ORIGIN },
+  });
+  assert.equal(logout.status, 403);
+  await logout.text(); // consume the body
+});
+
+// ---------------------------------------------------------------------------
+// Device flow (RFC 8628) helpers
+// ---------------------------------------------------------------------------
+
+/** The RFC 8628 client id the CLI uses; must match the server allowlist. */
+const CLI_CLIENT_ID = 'jsails-cli';
+
+/** Sign in through the login route and return the session cookie value. */
+async function signInCookie(app: TestApplication): Promise<string> {
+  const login = await app.request('/api/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', origin: app.origin },
+    body: new URLSearchParams({ email: USER.email, password: USER.password }).toString(),
+  });
+  assert.equal(login.status, 303);
+  const setCookie = login.headers.get('set-cookie');
+  assert.ok(setCookie, 'expected a Set-Cookie header on login');
+  await login.text(); // consume the body
+  return setCookie.split(';', 1)[0];
+}
+
+/** Request a device code as the CLI would. */
+async function requestDeviceCode(app: TestApplication): Promise<{
+  device_code: string;
+  user_code: string;
+}> {
+  const response = await app.request('/api/auth/device/code', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ client_id: CLI_CLIENT_ID }),
+  });
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as { device_code: string; user_code: string };
+  assert.ok(body.device_code, 'expected a device_code');
+  assert.ok(body.user_code, 'expected a user_code');
+  return body;
+}
+
+/** Poll the token endpoint once and return the status and parsed body. */
+async function exchangeDeviceToken(
+  app: TestApplication,
+  deviceCode: string,
+): Promise<{ status: number; body: Record<string, string> }> {
+  const response = await app.request('/api/auth/device/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      device_code: deviceCode,
+      client_id: CLI_CLIENT_ID,
+    }),
+  });
+  return { status: response.status, body: (await response.json()) as Record<string, string> };
+}
+
+// ---------------------------------------------------------------------------
+// Device flow tests
+// ---------------------------------------------------------------------------
+
+test(
+  'device flow: request a code, approve in the browser, redeem a token',
+  { skip, timeout: 30_000 },
+  async (t) => {
+    const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+    const cookie = await signInCookie(app);
+
+    // The CLI requests a device/user code.
+    const device = await requestDeviceCode(app);
+
+    // The signed-in browser user opens the approval page; this claims the code.
+    const page = await app.request(
+      `/device?user_code=${encodeURIComponent(device.user_code)}`,
+      { headers: { cookie } },
+    );
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /data-device-code/);
+    assert.match(html, new RegExp(device.user_code));
+
+    // Approve through the trusted hook route (plain form POST with the session).
+    const approve = await app.request('/api/device/approve', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie,
+        origin: app.origin,
+      },
+      body: new URLSearchParams({ user_code: device.user_code, action: 'approve' }).toString(),
+    });
+    assert.equal(approve.status, 303);
+    await approve.text(); // consume the body
+
+    // The CLI redeems a session token now that the code is approved.
+    const token = await exchangeDeviceToken(app, device.device_code);
+    assert.equal(token.status, 200);
+    assert.ok(token.body.access_token, 'expected an access_token');
+
+    // The bearer token authenticates the protected filesystem API.
+    const me = await app.request('/api/me', {
+      headers: { authorization: `Bearer ${token.body.access_token}` },
+    });
+    assert.equal(me.status, 200);
+    const meBody = (await me.json()) as { user?: { email?: string } };
+    assert.equal(meBody.user?.email, USER.email);
+  },
+);
+
+test(
+  'device flow: denying the code fails the token exchange',
+  { skip, timeout: 30_000 },
+  async (t) => {
+    const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+    const cookie = await signInCookie(app);
+
+    const device = await requestDeviceCode(app);
+
+    // Claim the code so the current session owns it.
+    const page = await app.request(
+      `/device?user_code=${encodeURIComponent(device.user_code)}`,
+      { headers: { cookie } },
+    );
+    assert.equal(page.status, 200);
+    await page.text();
+
+    const deny = await app.request('/api/device/deny', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie,
+        origin: app.origin,
+      },
+      body: new URLSearchParams({ user_code: device.user_code, action: 'deny' }).toString(),
+    });
+    assert.equal(deny.status, 303);
+    await deny.text();
+
+    const token = await exchangeDeviceToken(app, device.device_code);
+    assert.equal(token.status, 400);
+    assert.equal(token.body.error, 'access_denied');
+  },
+);
+
+test(
+  'device token endpoint reports authorization_pending before approval',
+  { skip, timeout: 30_000 },
+  async (t) => {
+    const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+    const device = await requestDeviceCode(app);
+
+    // A single poll before any claim/approval returns authorization_pending.
+    const token = await exchangeDeviceToken(app, device.device_code);
+    assert.equal(token.status, 400);
+    assert.equal(token.body.error, 'authorization_pending');
+  },
+);
+
+test('device code request rejects an unknown client id', { skip, timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+  const response = await app.request('/api/auth/device/code', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ client_id: 'not-the-cli' }),
+  });
+  assert.equal(response.status, 400);
+  const body = (await response.json()) as { error?: string };
+  assert.equal(body.error, 'invalid_client');
+});
+
+test('cross-origin device approval is rejected', { skip, timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+  const cookie = await signInCookie(app);
+  const device = await requestDeviceCode(app);
+
+  const approve = await app.request('/api/device/approve', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      cookie,
+      origin: EVIL_ORIGIN,
+    },
+    body: new URLSearchParams({ user_code: device.user_code, action: 'approve' }).toString(),
+  });
+  assert.equal(approve.status, 403);
+  await approve.text();
+
+  // The origin check rejected before Better Auth ran, so the code is untouched.
+  const token = await exchangeDeviceToken(app, device.device_code);
+  assert.equal(token.status, 400);
+  assert.equal(token.body.error, 'authorization_pending');
+});
+
+test('anonymous device page redirects to login via meta refresh', { skip, timeout: 30_000 }, async (t) => {
+  const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+  const page = await app.request('/device?user_code=ABCDEFGH');
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /http-equiv="refresh"/);
+  assert.match(html, /\/login\?next=/);
+});
+
+test(
+  'login forwards a validated next path and rejects an off-origin one',
+  { skip, timeout: 30_000 },
+  async (t) => {
+    const app = await createTestApp({ configPath: 'jsails.app.js', lifecycle: t });
+
+    // A local `next` is honored on success.
+    const login = await app.request('/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: app.origin },
+      body: new URLSearchParams({
+        email: USER.email,
+        password: USER.password,
+        next: '/device',
+      }).toString(),
+    });
+    assert.equal(login.status, 303);
+    assert.equal(login.headers.get('location'), '/device');
+    await login.text();
+
+    // A hostile absolute `next` is rejected and falls back to /dashboard.
+    const hostile = await app.request('/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: app.origin },
+      body: new URLSearchParams({
+        email: USER.email,
+        password: USER.password,
+        next: 'https://evil.example',
+      }).toString(),
+    });
+    assert.equal(hostile.status, 303);
+    assert.equal(hostile.headers.get('location'), '/dashboard');
+    await hostile.text();
+  },
+);

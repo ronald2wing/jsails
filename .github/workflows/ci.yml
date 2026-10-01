@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Cancel the in-flight run whenever a newer commit lands on the same ref.
+  # Rapid pushes to main otherwise queue runs that GitHub cancels mid-flight,
+  # which reports as a `failure` conclusion and masks the real result.
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - '20.19.0'
+          - '22.13.0'
+          - '26.x' # current dev version
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check (typecheck, lint, format, tests)
+        run: npm run check
+
+  starter:
+    name: Starter verification
+    runs-on: ubuntu-latest
+    needs: check
+    # Run unless the whole run was cancelled; a genuine check failure still
+    # blocks this job (needs: check), but a cancelled sibling leg does not.
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build framework
+        run: npm run build
+
+      # No browser is downloaded or launched; the pack/install/check/native-test
+      # pipeline runs, and each browser stage is recorded as an explicit skip.
+      - name: Verify starter (no browser)
+        run: npm run verify:starter -- --skip-browser
+
+  integrations:
+    name: Integrations (live services)
+    runs-on: ubuntu-latest
+    needs: check
+    if: ${{ !cancelled() }}
+    env:
+      JSAILS_TEST_DB_TYPE: ${{ secrets.JSAILS_TEST_DB_TYPE }}
+      JSAILS_TEST_DB_HOST: ${{ secrets.JSAILS_TEST_DB_HOST }}
+      JSAILS_TEST_DB_PORT: ${{ secrets.JSAILS_TEST_DB_PORT }}
+      JSAILS_TEST_DB_USER: ${{ secrets.JSAILS_TEST_DB_USER }}
+      JSAILS_TEST_DB_PASSWORD: ${{ secrets.JSAILS_TEST_DB_PASSWORD }}
+      JSAILS_TEST_DB_NAME: ${{ secrets.JSAILS_TEST_DB_NAME }}
+      JSAILS_TEST_VALKEY_URL: ${{ secrets.JSAILS_TEST_VALKEY_URL }}
+      JSAILS_TEST_DOCKER: ${{ secrets.JSAILS_TEST_DOCKER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build framework
+        run: npm run build
+
+      # verify:integrations requires dist/ and is env-gated per stage. Guard on
+      # the presence of any integration secret so an unconfigured repo skips the
+      # harness entirely instead of reporting four no-op "skipped" stages.
+      - name: Run live-service integrations
+        run: |
+          if [ -n "${JSAILS_TEST_DB_TYPE:-}${JSAILS_TEST_VALKEY_URL:-}${JSAILS_TEST_DOCKER:-}" ]; then
+            npm run verify:integrations
+          else
+            echo "No integration secrets configured; skipping verify:integrations."
+          fi

@@ -1,0 +1,264 @@
+/**
+ * Starter device-approval page.
+ *
+ * The browser half of the OAuth 2.0 Device Authorization Grant (RFC 8628).
+ * `jsails login` prints a verification URL like `/device?user_code=ABCD-EFGH`
+ * and a short user code; the user opens that URL here and, while signed in,
+ * approves or denies the request. The CLI polls `/api/auth/device/token` and
+ * receives a session token once approval lands.
+ *
+ * `load` resolves the code's state through Better Auth's `deviceVerify`, which
+ * also claims the code for the signed-in user on first view. There is no
+ * client SDK: the approve/deny forms POST to the trusted hook routes
+ * `/api/device/approve` and `/api/device/deny`, and the page re-reads the
+ * state on the redirect that follows.
+ *
+ * Pages cannot emit an HTTP redirect, so the signed-out case renders a
+ * standalone document with a `<meta http-equiv="refresh">` to
+ * `/login?next=/device?user_code=...` (plus a fallback link). Static export
+ * renders only the entry form: no signing, no redirect, no database access.
+ */
+
+import type { RequestContext } from 'jsails';
+
+import { createAuth, deviceApi } from '../app/application-auth.js';
+import { Field } from '../ui/components.js';
+import { Layout, loadLayout, type LayoutAssets } from '../ui/layout.js';
+
+/** The reviewable state of a device code, as reported by `deviceVerify`. */
+export interface DeviceReview {
+  status: 'pending' | 'approved' | 'denied';
+  /** The requesting client id, present only when this session owns the claim. */
+  clientId?: string;
+  /** The requested scopes, present only when this session owns the claim. */
+  scope?: string;
+}
+
+export interface DevicePageProps {
+  /** The user code under review, or null when none was supplied. */
+  userCode: string | null;
+  /** True when the request is unauthenticated and must redirect to `/login`. */
+  redirectToLogin: boolean;
+  /** True when a signed-in request held a code that could not be resolved. */
+  invalid: boolean;
+  /** The resolved review state, when the current session owns the code. */
+  review?: DeviceReview;
+  /** Resolved asset URLs, produced in `load` and forwarded to the layout. */
+  assets?: LayoutAssets;
+}
+
+export async function load(context: RequestContext): Promise<DevicePageProps> {
+  const userCode = context.url.searchParams.get('user_code');
+  const assets = await loadLayout(context);
+
+  // Static export renders only the entry form: no session, no signing key, no
+  // redirect, and no database access (the code never exists at build time).
+  if (context.renderMode === 'static') {
+    return { userCode: null, redirectToLogin: false, invalid: false, assets };
+  }
+
+  // Pages cannot redirect, so the component renders a meta-refresh instead.
+  if (context.session === null) {
+    return { userCode, redirectToLogin: true, invalid: false, assets };
+  }
+
+  if (userCode === null || userCode === '') {
+    return { userCode: null, redirectToLogin: false, invalid: false, assets };
+  }
+
+  // Signed-in live request: claim the code (first view) and read its status.
+  const auth = createAuth();
+  try {
+    const result = await deviceApi(auth).deviceVerify({
+      query: { user_code: userCode },
+      headers: context.request.headers,
+    });
+    const status = result.status;
+    if (status !== 'pending' && status !== 'approved' && status !== 'denied') {
+      return { userCode, redirectToLogin: false, invalid: true, assets };
+    }
+    return {
+      userCode,
+      redirectToLogin: false,
+      invalid: false,
+      review: {
+        status,
+        clientId: typeof result.client_id === 'string' ? result.client_id : undefined,
+        scope: typeof result.scope === 'string' ? result.scope : undefined,
+      },
+      assets,
+    };
+  } catch {
+    // Unknown, expired, or otherwise unresolvable code: show a generic message.
+    return { userCode, redirectToLogin: false, invalid: true, assets };
+  }
+}
+
+export default function DevicePage({
+  userCode,
+  redirectToLogin,
+  invalid,
+  review,
+  assets,
+}: DevicePageProps) {
+  if (redirectToLogin) {
+    const next = userCode
+      ? `/device?user_code=${encodeURIComponent(userCode)}`
+      : '/device';
+    const loginUrl = `/login?next=${encodeURIComponent(next)}`;
+    return (
+      <html lang="en" data-theme="light">
+        <head>
+          <meta charset="utf-8" />
+          <meta http-equiv="refresh" content={`0; url=${loginUrl}`} />
+          <title>Sign in required — JSails Starter</title>
+        </head>
+        <body class="min-h-screen bg-base-200">
+          <main class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-4 p-6">
+            <p>
+              You must be signed in to approve a device sign-in.{' '}
+              <a class="link" href={loginUrl}>
+                Continue to sign in
+              </a>
+            </p>
+          </main>
+        </body>
+      </html>
+    );
+  }
+
+  return (
+    <Layout title="Device sign-in — JSails Starter" assets={assets}>
+      <header class="text-center">
+        <h1 class="text-4xl font-bold tracking-tight">Device sign-in</h1>
+        <p class="mt-2 text-base-content/70">
+          Approve or deny a sign-in request from the command line.
+        </p>
+      </header>
+
+      {userCode === null ? (
+        <DeviceCodeEntry />
+      ) : invalid ? (
+        <section class="card w-full bg-base-100 shadow-xl">
+          <div class="card-body items-center text-center">
+            <p class="alert alert-error" role="alert">
+              That code is invalid or has expired.
+            </p>
+            <div class="card-actions">
+              <a class="btn btn-ghost" href="/device">
+                Try another code
+              </a>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <DeviceReviewCard userCode={userCode} review={review} />
+      )}
+    </Layout>
+  );
+}
+
+/** The entry form: type the code shown by the CLI and continue. */
+function DeviceCodeEntry() {
+  return (
+    <section class="card w-full bg-base-100 shadow-xl">
+      <div class="card-body">
+        <p class="text-base-content/70">
+          Enter the code shown by <code>jsails login</code>.
+        </p>
+        <form method="get" action="/device" class="flex w-full flex-col gap-4">
+          <Field id="user_code" label="Code">
+            <input
+              id="user_code"
+              type="text"
+              name="user_code"
+              class="input input-bordered w-full font-mono uppercase"
+              autocomplete="off"
+              spellcheck={false}
+              required
+            />
+          </Field>
+          <div class="card-actions justify-end">
+            <button type="submit" class="btn btn-primary">
+              Continue
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+/** The review card: terminal states, or the approve/deny decision. */
+function DeviceReviewCard({
+  userCode,
+  review,
+}: {
+  userCode: string;
+  review?: DeviceReview;
+}) {
+  if (review === undefined || review.status === 'approved' || review.status === 'denied') {
+    return (
+      <section class="card w-full bg-base-100 shadow-xl">
+        <div class="card-body items-center text-center">
+          <p data-device-result>
+            {review?.status === 'approved'
+              ? 'Device approved. You can close this tab.'
+              : review?.status === 'denied'
+                ? 'Device sign-in denied.'
+                : 'This code is no longer pending.'}
+          </p>
+          <div class="card-actions">
+            <a class="btn btn-ghost" href="/device">
+              Enter another code
+            </a>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // status === 'pending'
+  if (review.clientId === undefined) {
+    return (
+      <section class="card w-full bg-base-100 shadow-xl">
+        <div class="card-body items-center text-center">
+          <p class="text-base-content/70">
+            This code is already being reviewed by another session.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section class="card w-full bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title" data-device-code>
+          Code {userCode}
+        </h2>
+        <p class="text-base-content/70">
+          Allow <strong>{review.clientId}</strong>
+          {review.scope ? ` to access: ${review.scope}` : ' to sign in'} from the
+          command line?
+        </p>
+        <div class="card-actions justify-between">
+          <form method="post" action="/api/device/deny">
+            <input type="hidden" name="user_code" value={userCode} />
+            <input type="hidden" name="action" value="deny" />
+            <button type="submit" class="btn btn-outline">
+              Deny
+            </button>
+          </form>
+          <form method="post" action="/api/device/approve">
+            <input type="hidden" name="user_code" value={userCode} />
+            <input type="hidden" name="action" value="approve" />
+            <button type="submit" class="btn btn-primary">
+              Approve
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+  );
+}

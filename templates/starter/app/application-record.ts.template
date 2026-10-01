@@ -1,0 +1,24 @@
+/**
+ * Project-local Active Record base class + the declarative model DSL.
+ *
+ * Thin re-export of the framework's `BaseEntity` under the Rails-style
+ * `ApplicationRecord` name, plus the declarative relation/forwarding helpers
+ * (`belongs_to`, `has_many`, `has_one`, `delegate`,
+ * `accepts_nested_attributes_for`). Import once from this module and a model
+ * needs no further framework imports.
+ *
+ * Binding a record to a data source / repository stays explicit: this base
+ * class carries no implicit connection, so a model must be registered on a
+ * `JsailsDataSource` `entities` list (or seeded into a `FileDataSource`) by
+ * the application, never by this base class.
+ */
+
+export { BaseEntity as ApplicationRecord } from 'jsails';
+export {
+  belongs_to,
+  has_many,
+  has_one,
+  delegate,
+  accepts_nested_attributes_for,
+  encrypts,
+} from 'jsails';

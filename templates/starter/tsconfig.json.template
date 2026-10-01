@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": ".",
+    "outDir": "dist",
+    "sourceMap": true,
+    "strict": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsails",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "pages/**/*.ts",
+    "pages/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "api/**/*.ts",
+    "app/**/*.ts",
+    "ui/**/*.ts",
+    "ui/**/*.tsx",
+    "models/**/*.ts",
+    "jobs/**/*.ts",
+    "extensions/**/*.ts",
+    "commands/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "public", "out", "test/browser"]
+}

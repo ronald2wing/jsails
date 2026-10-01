@@ -1,0 +1,17 @@
+/**
+ * Project-local auth surface.
+ *
+ * Thin re-export of the first-party `auth` plugin (`jsails/auth`). Application
+ * code — the CLI commands, the device page, and the auth test suite — imports
+ * these from `../app/application-auth.js` instead of `jsails/auth`, so the
+ * `jsails/auth` import lives in this one shim. Server-only: importing it pulls
+ * in Better Auth, Kysely, and `mysql2`.
+ */
+
+export {
+  createAuth,
+  deviceApi,
+  getAuthMigrations,
+  resolveSessionFromRequest,
+} from 'jsails/auth';
+export { login, logout, whoami } from 'jsails/auth';

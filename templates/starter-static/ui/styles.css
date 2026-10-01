@@ -1,0 +1,26 @@
+/*
+ * JSails starter styles.
+ *
+ * Tailwind 4 with the daisyUI 5 plugin. This is a raw starter asset, not a
+ * package export: the application owns it and loads it from the document shell
+ * (see `templates/starter/pages/index.tsx`). The component module never imports
+ * it, so Node SSR stays CSS-free.
+ *
+ * The theme block below is a small configuration of daisyUI's built-in light
+ * theme, not a replacement design system. Add utilities in markup; only reach
+ * for custom CSS when a utility cannot express the intent.
+ */
+
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes: light --default;
+}
+
+@theme {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Keep the counter value legible as a focal number without a bespoke class. */
+[data-counter-value] {
+  font-variant-numeric: tabular-nums;
+}

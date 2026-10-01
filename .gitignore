@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment / secrets
+.env
+.env.*
+!.env.auth.example.template
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+
+# Static export output
+out/
+
+# Jamal deploy state (compose materialization + deploy history)
+.jamal/
+
+# Packed tarballs (npm pack output)
+*.tgz
+*.tar.gz
+
+# App runtime storage
+storage/
+
+# Pagefind / site build caches
+.content-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node tooling caches
+.turbo/
+.eslintcache

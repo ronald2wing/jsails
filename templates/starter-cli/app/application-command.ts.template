@@ -1,0 +1,9 @@
+/**
+ * Project-local CLI command surface.
+ *
+ * Thin re-export of the framework's `defineCommand`. CLI commands import it from
+ * `../app/application-command.js` instead of the root `jsails` entry, so the
+ * `jsails` import lives in this one shim.
+ */
+
+export { defineCommand } from 'jsails';

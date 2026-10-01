@@ -1,0 +1,25 @@
+/**
+ * `jsails logout` command.
+ *
+ * Deletes the stored CLI session credentials. Idempotent: signing out when not
+ * signed in is a no-op that still reports success and exits zero.
+ */
+
+import { defineCommand } from '../app/application-command.js';
+
+import { logout } from '../app/application-auth.js';
+
+export default defineCommand({
+  signature: 'logout',
+  summary: 'Delete the stored CLI session credentials',
+  audience: 'user',
+  async run(_input, ctx) {
+    try {
+      await logout();
+      return 0;
+    } catch (error) {
+      ctx.stderr(error instanceof Error ? error.message : 'logout failed');
+      return 1;
+    }
+  },
+});
