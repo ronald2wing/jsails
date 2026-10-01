@@ -1,0 +1,51 @@
+// jamal.config.js — the single deployment/planning config for `jsails jamal`.
+//
+// One file drives both environments (there is no "mode" flag): `jamal dev` and
+// `jamal up` start the local backing services, and `jamal deploy` plans a
+// production release. The `services` map declares the backing services the app
+// depends on — MariaDB (`db`, the recommended default) and Valkey (`valkey`,
+// the Redis-compatible store JSails uses for cache, jobs, and broadcast) — and
+// `local.ports` publishes them on loopback so the app running on the host can
+// reach them. See the "Jamal" section of the bundled guide for the full command
+// surface.
+import { secret } from 'jsails';
+
+export default {
+  // Compose project name (local) and container-name prefix (production).
+  service: 'jsails-app',
+  // Production image reference; replace with your registry/name before deploy.
+  image: 'jsails-app',
+  // The app answers /up (the default healthPath); Jamal polls it after a deploy.
+  health: { path: '/up', timeoutMs: 5000, intervalMs: 30000 },
+  // Environment the app reads. Each name becomes a production secret; in local
+  // development Docker Compose interpolates it as ${NAME} from the host, so no
+  // value is ever written here.
+  env: {
+    DATABASE_HOST: secret('DATABASE_HOST'),
+    DATABASE_PORT: secret('DATABASE_PORT'),
+    DATABASE_USER: secret('DATABASE_USER'),
+    DATABASE_PASSWORD: secret('DATABASE_PASSWORD'),
+    DATABASE_NAME: secret('DATABASE_NAME'),
+    VALKEY_URL: secret('VALKEY_URL'),
+    BETTER_AUTH_SECRET: secret('BETTER_AUTH_SECRET'),
+    JSAILS_COMPONENT_SECRET: secret('JSAILS_COMPONENT_SECRET'),
+  },
+  // Backing services: MariaDB and Valkey (Redis).
+  services: {
+    db: { type: 'mariadb' },
+    valkey: { type: 'valkey' },
+  },
+  local: {
+    // Loopback-published ports so the app on the host reaches the services.
+    ports: { db: 3306, valkey: 6379 },
+    // false: the app runs on the host via `npm run dev`/`serve`; set true to
+    // build and run the app in a container instead.
+    build: false,
+  },
+  // Production overlay — uncomment and fill in to deploy:
+  // production: {
+  //   server: 'your.server.example',
+  //   domain: 'example.com',
+  //   registry: { server: 'registry.example.com', username: 'you' },
+  // },
+};

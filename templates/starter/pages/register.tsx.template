@@ -1,0 +1,62 @@
+/**
+ * Starter self-registration page.
+ *
+ * Renders the `<RegisterForm>` island inside the shared layout. The island is
+ * the only client JavaScript on the page (the `/api/register` route answers
+ * JSON, not a server redirect, so the form needs a small client island to
+ * fetch and redirect). The island markers are the SSR/author contract:
+ * `data-jsails-island="register-form"` names the registered component, and the
+ * server-rendered `<RegisterForm />` below is what the client hydrates.
+ */
+
+import type { RequestContext } from 'jsails';
+
+import { RegisterForm } from '../ui/register-form.js';
+import { Layout, loadLayout, type LayoutAssets } from '../ui/layout.js';
+
+export interface RegisterPageProps {
+  /** Resolved asset URLs, produced in `load` and forwarded to the layout. */
+  assets?: LayoutAssets;
+  /** The current request path, used to mark the active nav link. */
+  path?: string;
+}
+
+export async function load(context: RequestContext): Promise<RegisterPageProps> {
+  return {
+    assets: await loadLayout(context),
+    path: context.url.pathname,
+  };
+}
+
+export default function RegisterPage({ assets, path }: RegisterPageProps) {
+  return (
+    <Layout title="Create an account — JSails Starter" assets={assets} path={path}>
+      <div class="mx-auto flex w-full max-w-md flex-col gap-6 py-6">
+        <header class="flex flex-col items-center gap-3 text-center">
+          <span class="brand-mark" aria-hidden="true">
+            J
+          </span>
+          <h1 class="text-3xl font-bold tracking-tight">Create an account</h1>
+          <p class="text-sm text-base-content/65">
+            Self-registration creates a local account. No client SDK; the form posts to the server.
+          </p>
+        </header>
+
+        <section class="card border border-base-300/70 bg-base-100 shadow-sm">
+          <div class="card-body gap-5">
+            <div data-jsails-island="register-form">
+              <RegisterForm />
+            </div>
+          </div>
+        </section>
+
+        <p class="text-center text-sm text-base-content/55">
+          Already have an account?{' '}
+          <a class="link link-hover" href="/login">
+            Sign in
+          </a>
+        </p>
+      </div>
+    </Layout>
+  );
+}

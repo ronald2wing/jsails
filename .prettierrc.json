@@ -1,0 +1,32 @@
+{
+  "singleQuote": true,
+  "semi": true,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "overrides": [
+    {
+      "files": "**/*.ts.template",
+      "options": { "parser": "typescript" }
+    },
+    {
+      "files": "**/*.tsx.template",
+      "options": { "parser": "typescript" }
+    },
+    {
+      "files": "**/*.js.template",
+      "options": { "parser": "babel" }
+    },
+    {
+      "files": "**/*.mjs.template",
+      "options": { "parser": "babel" }
+    },
+    {
+      "files": "**/*.json.template",
+      "options": { "parser": "json" }
+    }
+  ]
+}

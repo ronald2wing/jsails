@@ -1,0 +1,189 @@
+/*
+ * JSails starter styles.
+ *
+ * Tailwind 4 with the daisyUI 5 plugin. This is a raw starter asset, not a
+ * package export: the application owns it and loads it from the document shell
+ * (see `ui/layout.tsx`). The component modules never import it, so Node SSR
+ * stays CSS-free.
+ *
+ * The design is a modern application shell built from daisyUI components and
+ * Tailwind utilities. Themes come straight from daisyUI — no custom palette is
+ * declared, so the app owns its look and can switch themes or restyle freely.
+ * `aqua` (the sea/ocean theme matching the JSails name) is the default and
+ * `night` follows the OS `prefers-color-scheme`; the theme-toggle island
+ * overrides it and persists the choice to localStorage.
+ *
+ * Add utilities in markup; only reach for custom CSS when a utility cannot
+ * express the intent (the hero glow, the brand mark, the toggle track).
+ */
+
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes:
+    aqua --default,
+    night --prefersdark;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Type tokens                                                                */
+/* -------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Base                                                                       */
+/* -------------------------------------------------------------------------- */
+
+html {
+  /* Anchor jumps land below the sticky header instead of under it. */
+  scroll-padding-top: 5.5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  /* A faint accent wash at the top of the page, no image request. */
+  background-image: radial-gradient(
+    ellipse 80% 40% at 50% -10%,
+    color-mix(in oklab, var(--color-primary) 10%, transparent),
+    transparent 70%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 40rem;
+}
+
+/* A visible, on-brand focus ring for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Keep the counter value legible as a focal number without a bespoke class. */
+[data-counter-value] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Brand mark                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The nav brand: a small rounded accent tile with a glyph, plus the wordmark.
+ * The tile is a gradient so it reads as a product logo rather than a plain
+ * square, and it scales with the surrounding text.
+ */
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background-image: linear-gradient(
+    135deg,
+    var(--color-primary),
+    color-mix(in oklab, var(--color-accent) 70%, var(--color-primary))
+  );
+  color: var(--color-primary-content);
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1;
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hero glow                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * A soft radial glow behind the hero content. It is a pseudo-element so it
+ * never affects layout, and it fades out at the edges rather than clipping.
+ */
+.hero-glow {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero-glow::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 24rem;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse 60% 60% at 50% 30%,
+    color-mix(in oklab, var(--color-primary) 22%, transparent),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Theme toggle                                                               */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * A compact pill toggle. The track is a neutral surface; the thumb slides and
+ * swaps the sun/moon glyph. The whole control is a single button, so keyboard
+ * and screen-reader behavior come from the native element.
+ */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.theme-toggle-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: var(--color-base-300);
+  transition: background-color 150ms ease;
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  left: 0.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  font-size: 0.7rem;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+  transition: transform 150ms ease;
+}
+
+/* The thumb slides right when the dark theme is active. */
+html[data-theme='night'] .theme-toggle-thumb {
+  transform: translateX(1.25rem);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Motion                                                                     */
+/* -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

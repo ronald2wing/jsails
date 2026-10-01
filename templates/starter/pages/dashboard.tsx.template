@@ -1,0 +1,133 @@
+/**
+ * Starter dashboard page.
+ *
+ * Pages are not covered by the global `authorize`, so this page always renders;
+ * it derives its state from the server-side session instead. When
+ * `context.session` is null it shows a signed-out prompt with a sign-in link;
+ * otherwise it shows the user's name and email beside a sign-out form.
+ *
+ * The user view is deliberately narrow: `load` projects only `id`, `name`, and
+ * `email` out of `context.session.data.user`, so nothing else in the session
+ * data can leak into the page. No client SDK and no secret is used here — the
+ * sign-out form is a plain POST to `/api/logout`.
+ *
+ * Stable `data-*` markers are the browser-verification contract:
+ * - `data-signed-out` — present on the prompt when no session is active
+ * - `data-user-email` — the signed-in user's email
+ */
+
+import type { RequestContext } from 'jsails';
+
+import { Layout, loadLayout, type LayoutAssets } from '../ui/layout.js';
+
+/** The only session fields surfaced to this page. */
+export interface UserView {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface DashboardPageProps {
+  /** The signed-in user's id/name/email, or null when signed out. */
+  user: UserView | null;
+  /** Resolved asset URLs, produced in `load` and forwarded to the layout. */
+  assets?: LayoutAssets;
+  /** The current request path, used to mark the active nav link. */
+  path?: string;
+}
+
+/**
+ * Narrow an unknown session value to a safe user view (id/name/email only).
+ * Returns null for anything that is not an object carrying all three strings.
+ */
+function toUserView(value: unknown): UserView | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const { id, name, email } = record;
+  if (typeof id !== 'string' || typeof name !== 'string' || typeof email !== 'string') {
+    return null;
+  }
+  return { id, name, email };
+}
+
+/** The first letter of a display name, for the avatar tile. */
+function initialOf(name: string): string {
+  const trimmed = name.trim();
+  return trimmed.length > 0 ? trimmed[0].toUpperCase() : '?';
+}
+
+export async function load(context: RequestContext): Promise<DashboardPageProps> {
+  const session = context.session;
+  const user = session === null ? null : toUserView(session.data.user ?? null);
+  return { user, assets: await loadLayout(context), path: context.url.pathname };
+}
+
+export default function DashboardPage({ user, assets, path }: DashboardPageProps) {
+  return (
+    <Layout title="Dashboard — JSails Starter" assets={assets} path={path}>
+      <header class="flex flex-col gap-3">
+        <span class="text-xs font-medium uppercase tracking-wider text-base-content/50">
+          Account
+        </span>
+        <h1 class="text-4xl font-bold tracking-tight">Dashboard</h1>
+        <p class="max-w-2xl text-base-content/65">
+          Signed-in state, derived from the server-side session.
+        </p>
+      </header>
+
+      <div class="mt-8 max-w-xl">
+        {user === null ? (
+          <section class="card border border-base-300/70 bg-base-100 shadow-sm" data-signed-out>
+            <div class="card-body items-center gap-4 text-center">
+              <span
+                class="flex h-12 w-12 items-center justify-center rounded-full bg-base-200 text-xl text-base-content/40"
+                aria-hidden="true"
+              >
+                ?
+              </span>
+              <div class="flex flex-col gap-1">
+                <h2 class="card-title justify-center text-lg">You are signed out</h2>
+                <p class="text-sm text-base-content/65">
+                  Sign in to see your account and manage your session.
+                </p>
+              </div>
+              <div class="card-actions">
+                <a class="btn btn-primary" href="/login">
+                  Sign in
+                </a>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section class="card border border-base-300/70 bg-base-100 shadow-sm">
+            <div class="card-body gap-5">
+              <div class="flex items-center gap-4">
+                <span
+                  class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-lg font-semibold text-primary-content"
+                  aria-hidden="true"
+                >
+                  {initialOf(user.name)}
+                </span>
+                <div class="flex flex-col">
+                  <h2 class="text-lg font-semibold leading-tight">{user.name}</h2>
+                  <p class="text-sm text-base-content/65" data-user-email>
+                    {user.email}
+                  </p>
+                </div>
+              </div>
+              <div class="divider my-0" />
+              <div class="flex items-center justify-between gap-4">
+                <p class="text-sm text-base-content/55">Signed in with a local account.</p>
+                <form method="post" action="/api/logout">
+                  <button type="submit" class="btn btn-outline btn-sm">
+                    Sign out
+                  </button>
+                </form>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+    </Layout>
+  );
+}

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "strict": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"]
+  },
+  "include": [
+    ".jsails/project-symbols.app.d.ts",
+    ".jsails/framework-symbols.d.ts",
+    "client/**/*.ts",
+    "client/**/*.tsx",
+    "shared/**/*.ts",
+    "ui/**/*.ts",
+    "ui/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "public", "out"]
+}

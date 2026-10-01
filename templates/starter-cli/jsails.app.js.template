@@ -1,0 +1,19 @@
+// A CLI-only JSails project: the same framework and extension seam as the web
+// starter, with no web surface. `plugins.use` is empty because a CLI project
+// ships no web plugins; add specifiers here (e.g. `'jsails/jobs'`) to opt into
+// cache, filesystem, mail, jobs, diagnostics, or flags.
+export default {
+  rootDir: '.',
+  plugins: { use: [] },
+  commands: [
+    {
+      name: 'about',
+      summary: 'Show framework and project information',
+      audience: 'developer',
+      run(_rawArgs, ctx) {
+        ctx.stdout('JSails CLI project — same framework, no web surface.');
+        return 0;
+      },
+    },
+  ],
+};

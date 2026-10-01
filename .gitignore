@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Generated build meta (symbols preload, shims, ambient decls)
+.jsails/
+
+# Logs
+*.log
+npm-debug.log*
+
+# ESLint cache (from `eslint . --cache`)
+.eslintcache
+
+# Environment / secrets
+.env
+.env.*
+!.env.auth.example.template
+!.env.example
+!.env.testing.example
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+
+# Static export output
+out/
+
+# Jamal deploy state (compose materialization + deploy history)
+.jamal/
+
+# Packed tarballs (npm pack output)
+*.tgz
+*.tar.gz
+
+# App runtime storage
+storage/
+
+# Pagefind / site build caches
+.content-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node tooling caches
+.turbo/
+
+# Local Netlify folder
+.netlify

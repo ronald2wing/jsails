@@ -1,0 +1,28 @@
+dist
+node_modules
+coverage
+test-results
+playwright-report
+out
+.content-cache
+.netlify
+.jamal
+.turbo
+storage
+*.tgz
+**/public/assets
+package-lock.json
+*.md
+
+# Non-code templates are excluded rather than the whole `templates/` tree, so
+# every code template (`.ts`/`.tsx`/`.js`/`.mjs`/`.json`, both plain and
+# `.template`) is formatted by Prettier and ships formatted. These files are not
+# parseable as their base language, or are rewritten by the scaffold instead of
+# copied verbatim:
+# - `package.json.template` carries the `__JSAILS_DEPENDENCY__` placeholder and
+#   is JSON-parsed then re-stringified by `src/app/starter/package-json.ts`;
+# - `.gitignore` / `.env.*` / `README.md` are not code.
+templates/**/package.json.template
+templates/**/.gitignore.template
+templates/**/.env.*.template
+templates/**/*.md.template

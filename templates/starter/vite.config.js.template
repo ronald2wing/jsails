@@ -1,0 +1,61 @@
+import preact from '@preact/preset-vite';
+import tailwindcss from '@tailwindcss/vite';
+import {
+  autoloadPlugin,
+  cleanBundlePlugin,
+  compilerPlugin,
+  serverDirectivePlugin,
+} from 'jsails/build';
+import { defineConfig } from 'vite';
+
+/**
+ * Client build for the JSails starter.
+ *
+ * Backend page/UI modules are compiled by `tsc -p tsconfig.json` into `dist`;
+ * this config only bundles the browser entry. Output lands in `public/assets`,
+ * which the JSails app copies into `out` during `jsails build`. The entry is
+ * emitted as a stable `app.js` and the extracted stylesheet as `app.css` at the
+ * root of that directory, so the SSR document shell can link them by fixed
+ * path; any secondary chunk or asset goes into a hashed `assets/` subdirectory.
+ *
+ * The four JSails build plugins guard the client/server seam and lower the
+ * component dialects: `compilerPlugin` compiles `.jsails` single-file
+ * components and `// #region` `.tsx` components into plain `defineComponent`
+ * modules (running first, so later transforms see valid TSX);
+ * `autoloadPlugin` injects imports for the N1 auto-import tree (`app/`,
+ * `server/`, `shared/`) from the precomputed `.jsails/autoload.json` registry
+ * that `jsails build:meta` writes before `tsc`;
+ * `serverDirectivePlugin` strips any `'use server'`-marked
+ * function body so a co-located server-only helper is safe to import; and
+ * `cleanBundlePlugin` fails the build outright if a `*.server.ts` module
+ * reaches a client chunk.
+ */
+export default defineConfig({
+  base: '/assets/',
+  plugins: [
+    compilerPlugin(),
+    autoloadPlugin(),
+    serverDirectivePlugin(),
+    preact(),
+    tailwindcss(),
+    cleanBundlePlugin({
+      serverOnly: (id) => id.endsWith('.server.ts') || id.endsWith('.server.tsx'),
+    }),
+  ],
+  build: {
+    outDir: 'public/assets',
+    emptyOutDir: true,
+    cssCodeSplit: false,
+    rolldownOptions: {
+      input: 'client/main.tsx',
+      output: {
+        entryFileNames: 'app.js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: (assetInfo) => {
+          const name = assetInfo.names[0] ?? '';
+          return name.endsWith('.css') ? 'app.css' : 'assets/[name]-[hash][extname]';
+        },
+      },
+    },
+  },
+});

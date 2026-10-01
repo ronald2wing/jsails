@@ -1,0 +1,23 @@
+// Create the framework-owned database tables (sessions, plugin state, and — for
+// the blog starter — blog posts) by reconciling the declared model schema
+// against the live database.
+//
+// Usage: node scripts/db-migrate.mjs
+//
+// This script runs `jsails db:push`, which diffs the models in
+// `jsails.config.js` against the live MariaDB database and applies the plan. It
+// uses the same `DATABASE_*` environment variables the app does, so run it with
+// the same environment the app will use; JSails never loads a `.env` file.
+// Re-running it is a no-op once the schema matches the models.
+import { spawnSync } from 'node:child_process';
+
+const config = 'jsails.config.js';
+const bin = process.platform === 'win32' ? 'jsails.cmd' : 'jsails';
+
+console.log('Reconciling the database schema...');
+const result = spawnSync(bin, ['db:push', '--config', config], { stdio: 'inherit' });
+if (result.error) {
+  console.error(`Failed to run ${bin}: ${result.error.message}`);
+  process.exit(1);
+}
+process.exit(result.status ?? 1);

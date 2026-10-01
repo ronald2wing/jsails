@@ -1,0 +1,129 @@
+# Authentication (Better Auth)
+
+The starter ships local email/password sign-in. It is not a production
+authentication system: registration is a CLI command, and password reset,
+email verification, OAuth, roles, and rate limiting are deliberately deferred
+(see below).
+
+## One-time setup
+
+1. Start MariaDB. Auth needs a running MariaDB (the recommended default);
+   `jamal up` starts one locally. Auth requires a database connection.
+
+2. Export the connection variables and a signing secret. Better Auth requires a
+   secret of at least 32 bytes, and the framework never loads `.env` files —
+   export them in your shell, process manager, or deploy platform instead:
+
+   ```sh
+   export DATABASE_HOST=127.0.0.1
+   export DATABASE_PORT=3306       # default, optional
+   export DATABASE_USER=...
+   export DATABASE_PASSWORD=...
+   export DATABASE_NAME=...
+   export BETTER_AUTH_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")"
+   ```
+
+3. Build the server, then run the Better Auth migrations (they run against the
+   compiled output, so build first):
+
+   ```sh
+   npm run build
+   npm run auth:migrate
+   ```
+
+4. Create the first account. `name` is optional; email and password are
+   required:
+
+   ```sh
+   npm run user:create -- you@example.com 'a long password' "Your Name"
+   ```
+
+5. Run the app:
+
+   ```sh
+   npm run dev
+   ```
+
+Visit `/login` to sign in and `/dashboard` to see the signed-in state.
+
+## How it fits together
+
+- Better Auth owns its tables in a MariaDB database you point it at through the
+  `DATABASE_*` variables (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`,
+  `DATABASE_PASSWORD`, `DATABASE_NAME`), a separate schema from any application
+  data you add later. `BETTER_AUTH_SECRET` signs its sessions. Keep the
+  credentials out of version control.
+- `/api/login` and `/api/logout` are plain form targets: the pages post to them
+  and the handlers call Better Auth server-side. There is no browser SDK and no
+  secret in the client bundle. They are mounted as trusted extension hook routes
+  (see `jsails.app.js`), not filesystem API routes, so they bypass the
+  filesystem default-deny `authorize` and the session CSRF middleware — a plain
+  form POST works even while a session cookie is present.
+- Each of those handlers owns its own same-origin check: the request's `Origin`
+  must match the configured `publicOrigin` (falling back to the request URL
+  origin when unset), and a mismatch is rejected with `403` before any
+  credentials are read.
+- `/api/me` returns the current user and is the one protected filesystem API:
+  the app's global `authorize` is default-deny, so every filesystem API request
+  is rejected unless a session is present. Pages are not covered by `authorize`,
+  so `/dashboard` renders a signed-out prompt when the session is absent.
+- Login/logout own their origin checks, but they are trusted hook routes and do
+  not set a precedent: any authenticated filesystem mutation you add
+  (`POST`/`PUT`/`PATCH`/`DELETE` under `api/`) still runs the framework CSRF
+  pipeline, which requires a same-origin `Origin` and a matching `X-CSRF-Token`
+  for cookie-authenticated requests. Supply `context.session.csrfToken` as that
+  header.
+
+## CLI login (browser-approved)
+
+The same repository builds the web app **and** a small CLI: `commands/*` modules
+compile into `dist/commands/` and are run with `jsails <name>`. Three commands
+ship:
+
+```sh
+jsails login      # request a device code and approve it in the browser
+jsails whoami     # print the signed-in account (name and email)
+jsails logout     # delete the stored CLI session credentials
+```
+
+`jsails login` runs the OAuth 2.0 Device Authorization Grant (RFC 8628) against
+the app's Better Auth device endpoints. It requests a code, prints a short user
+code and a verification URL, opens the browser for you (pass `--no-open` to
+skip), and polls until you approve. Approve it on the `/device` page — the same
+page a browser user reaches after choosing "Sign in from a device" on `/login` —
+by confirming the user code while signed in. The CLI's base URL comes from
+`APP_URL`, then `BETTER_AUTH_URL`, then `http://localhost:3000`.
+
+The resulting access token is a Better Auth **session token** (not a separate
+credential), stored on disk so later `jsails whoami` / `jsails logout` runs can
+use it:
+
+- **Location:** `${XDG_CONFIG_HOME:-~/.config}/jsails/<appName>/credentials.json`,
+  where `<appName>` is the package name (or the directory basename when no
+  `package.json` is present). The directory is created `0700` and the file is
+  written atomically (temp file + rename) with mode `0600`, so other local
+  users cannot read the token.
+- **Shape:** `{ baseUrl, token, tokenType, expiresAt, scope }`. The token is
+  never printed by the CLI.
+
+### Security notes
+
+- The device flow is Better Auth's official RFC 8628 implementation. The
+  `client_id` (`jsails-cli`) must match the server's `validateClient` allowlist,
+  and approval requires an authenticated session on `/device` — the CLI never
+  sees the user's password.
+- Tokens are session tokens: revoke one by clearing/rotating its session
+  server-side (Better Auth session revocation), and remove the CLI-side copy
+  with `jsails logout`. Re-running `jsails login` simply overwrites the
+  credentials file.
+- The token is stored in plain text on disk (mode `0600`). Treat the account the
+  same as a saved browser session, and run `jsails logout` on shared machines.
+
+## Deliberately deferred
+
+- Registration UI — new accounts are created with `npm run user:create`.
+- Password reset and email verification.
+- OAuth / social sign-in.
+- Roles / RBAC — there is one flat set of users with no permissions.
+- Production hardening — rate limiting, account lockout, and audit logging are
+  not implemented.

@@ -1,0 +1,27 @@
+/**
+ * `jsails whoami` command.
+ *
+ * Prints the signed-in account (`name <email>`, or just the email). Fails with
+ * a clear "not signed in" or "session expired" message (the latter also deletes
+ * the stale credentials) and a nonzero exit when the session is absent or no
+ * longer valid.
+ */
+
+import { defineCommand } from '../app/application-command.js';
+
+import { whoami } from '../app/application-auth.js';
+
+export default defineCommand({
+  signature: 'whoami',
+  summary: 'Print the signed-in account (name and email)',
+  audience: 'user',
+  async run(_input, ctx) {
+    try {
+      await whoami();
+      return 0;
+    } catch (error) {
+      ctx.stderr(error instanceof Error ? error.message : 'whoami failed');
+      return 1;
+    }
+  },
+});

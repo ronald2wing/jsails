@@ -1,0 +1,19 @@
+/**
+ * Current user for the Better Auth starter.
+ *
+ * A read-only `GET` endpoint returning the authenticated user. It is protected
+ * by the global `authorize` (see `jsails.app.js`), which is default-deny:
+ * a request without a session is rejected with `403 { error: { code:
+ * "forbidden" } }` before this handler runs, so a request that reaches here has
+ * a non-null session. The `null` guard below is a defensive type narrowing, not
+ * a second authorization layer.
+ */
+
+import type { RequestContext } from 'jsails';
+
+export function GET(_request: Request, context: RequestContext): Response {
+  if (context.session === null) {
+    return Response.json({ user: null }, { status: 401 });
+  }
+  return Response.json({ user: context.session.data.user });
+}

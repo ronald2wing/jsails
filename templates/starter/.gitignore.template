@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.jamal/
+.jsails/
+public/assets/
+out/
+test-results/
+playwright-report/
+.env
+.env.*

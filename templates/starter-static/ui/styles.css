@@ -1,0 +1,333 @@
+/*
+ * Static-blog styles.
+ *
+ * Tailwind 4 with the daisyUI 5 plugin. This is a raw starter asset, not a
+ * package export: the application owns it and loads it from the document shell
+ * (see `ui/layout.tsx`). The component modules never import it, so Node SSR
+ * stays CSS-free.
+ *
+ * The design is typography-first: a serif for headings and post titles, a
+ * system sans for body copy, and a monospace for dates and counts.
+ *
+ * Themes come straight from daisyUI — no custom palette is declared, so the
+ * app owns its look and can switch themes or restyle freely. `light` is the
+ * default and `dark` follows the OS `prefers-color-scheme`, with no
+ * `data-theme` pinned on `<html>`. The `.prose` rules below style rendered
+ * Markdown; Tailwind's typography plugin is deliberately not installed (no new
+ * dependency for one stylesheet), so the element rules a blog body needs are
+ * written out by hand.
+ */
+
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes:
+    light --default,
+    dark --prefersdark;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Type tokens                                                                */
+/* -------------------------------------------------------------------------- */
+
+@theme {
+  /* Serif for display/headings; the system stack keeps offline builds working. */
+  --font-serif:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Times New Roman',
+    serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* A slightly wider measure than the default for long-form reading. */
+  --measure: 68ch;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Base                                                                       */
+/* -------------------------------------------------------------------------- */
+
+html {
+  /* Anchor jumps land below the sticky header instead of under it. */
+  scroll-padding-top: 5.5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  /* A faint tonal wash at the top, derived from the theme surface, no image. */
+  background-image: radial-gradient(
+    circle at 50% 0%,
+    color-mix(in oklab, var(--color-base-200) 55%, transparent),
+    transparent 60%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 40rem;
+}
+
+/* Headings default to the serif face; pages opt into sizes per element. */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* Dates, counts, and other meta read as tabular monospace. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* A visible, on-brand focus ring for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Editorial primitives                                                       */
+/* -------------------------------------------------------------------------- */
+
+/* The thin rule used under the masthead and between archive years. */
+.rule {
+  border: 0;
+  border-top: 1px solid var(--color-base-300);
+}
+
+/* A small-caps eyebrow label above a section or page title. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+
+/* The oversized serif display used by the home hero and post titles. */
+.display {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+/*
+ * A post row: a left rail for the date and a body column for the title,
+ * excerpt, and tags. On narrow screens the rail collapses above the body.
+ */
+.post-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem 1.75rem;
+}
+
+@media (min-width: 40rem) {
+  .post-row {
+    grid-template-columns: 7.5rem 1fr;
+  }
+}
+
+/* The title link shifts to the accent and nudges right on hover. */
+.post-title {
+  transition:
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.post-row:hover .post-title {
+  color: var(--color-primary);
+  transform: translateX(2px);
+}
+
+/* A quiet tag link: monospace, muted, underline on hover. */
+.tag-link {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  transition: color 150ms ease;
+}
+
+.tag-link:hover {
+  color: var(--color-primary);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Rendered markdown (`.prose`)                                                */
+/* -------------------------------------------------------------------------- */
+
+.prose {
+  /* A comfortable reading measure for body copy. */
+  max-width: var(--measure);
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  color: color-mix(in oklab, var(--color-base-content) 92%, transparent);
+}
+
+.prose > * + * {
+  margin-top: 1.35em;
+}
+
+/*
+ * The first paragraph after the title reads as a lead-in: slightly larger and
+ * a touch darker, the way a magazine opens a feature.
+ */
+.prose > p:first-child {
+  font-size: 1.2rem;
+  line-height: 1.7;
+  color: var(--color-base-content);
+}
+
+.prose h2 {
+  margin-top: 2.5em;
+  margin-bottom: 0.7em;
+  font-size: 1.6rem;
+  line-height: 1.25;
+  scroll-margin-top: 5.5rem;
+}
+
+.prose h3 {
+  margin-top: 1.9em;
+  margin-bottom: 0.5em;
+  font-size: 1.25rem;
+  line-height: 1.35;
+  scroll-margin-top: 5.5rem;
+}
+
+.prose h4 {
+  margin-top: 1.6em;
+  margin-bottom: 0.4em;
+  font-size: 1.05rem;
+  scroll-margin-top: 5.5rem;
+}
+
+.prose a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-thickness 120ms ease;
+}
+
+.prose a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.prose strong {
+  font-weight: 650;
+  color: var(--color-base-content);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+}
+
+.prose ul {
+  list-style: disc;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose li + li {
+  margin-top: 0.45em;
+}
+
+.prose li::marker {
+  color: color-mix(in oklab, var(--color-primary) 70%, transparent);
+}
+
+/*
+ * Blockquotes read as pull-quotes: a serif face, an accent rule on the left,
+ * and no italic — the size and face carry the emphasis instead.
+ */
+.prose blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding: 0.25em 0 0.25em 1.25em;
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  line-height: 1.6;
+  color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+}
+
+.prose blockquote p {
+  margin: 0;
+}
+
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: color-mix(in oklab, var(--color-base-300) 60%, transparent);
+  border-radius: 0.3rem;
+  padding: 0.15em 0.4em;
+}
+
+.prose pre {
+  overflow-x: auto;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-base-300);
+  background: var(--color-base-200);
+  padding: 1.1rem 1.3rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+/* Reset the inline-code chrome inside a fenced block. */
+.prose pre code {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+.prose img {
+  border-radius: 0.6rem;
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--color-base-300);
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--color-base-300);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.prose th {
+  background: var(--color-base-200);
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Motion                                                                     */
+/* -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .post-row:hover .post-title {
+    transform: none;
+  }
+}

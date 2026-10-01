@@ -1,0 +1,119 @@
+/**
+ * Starter login page.
+ *
+ * A plain, server-rendered form that posts credentials to the `/api/login`
+ * route. There is no client SDK and no JavaScript here: the browser's native
+ * form submission sends `email`/`password` as URL-encoded form data, and the
+ * route (server-side Better Auth) verifies them and redirects. On failure the
+ * route redirects back to `/login?error=1`, which this page's `load` reads to
+ * render the generic "Invalid email or password." alert.
+ *
+ * The credentials are ordinary form fields. They are never placed in a
+ * snapshot, a data attribute, or the client bundle — only the route sees the
+ * password.
+ */
+
+import type { RequestContext } from 'jsails';
+
+import { Field } from '../ui/components.js';
+import { Layout, loadLayout, type LayoutAssets } from '../ui/layout.js';
+
+export interface LoginPageProps {
+  /** True when the previous attempt failed (the route redirected to `?error=1`). */
+  error: boolean;
+  /**
+   * The post-login redirect target the route forwards on success, when the
+   * page was reached with a `?next=` (e.g. from the device-approval page). It
+   * is echoed back as a hidden field so a failed attempt preserves it.
+   */
+  next?: string;
+  /** Resolved asset URLs, produced in `load` and forwarded to the layout. */
+  assets?: LayoutAssets;
+  /** The current request path, used to mark the active nav link. */
+  path?: string;
+}
+
+export async function load(context: RequestContext): Promise<LoginPageProps> {
+  return {
+    assets: await loadLayout(context),
+    error: context.url.searchParams.get('error') === '1',
+    next: context.url.searchParams.get('next') ?? undefined,
+    path: context.url.pathname,
+  };
+}
+
+export default function LoginPage({ error, next, assets, path }: LoginPageProps) {
+  return (
+    <Layout title="Sign in — JSails Starter" assets={assets} path={path}>
+      <div class="mx-auto flex w-full max-w-md flex-col gap-6 py-6">
+        <header class="flex flex-col items-center gap-3 text-center">
+          <span class="brand-mark" aria-hidden="true">
+            J
+          </span>
+          <h1 class="text-3xl font-bold tracking-tight">Sign in</h1>
+          <p class="text-sm text-base-content/65">
+            Sign in with a local account. The form posts to the server; no client SDK runs.
+          </p>
+        </header>
+
+        <section class="card border border-base-300/70 bg-base-100 shadow-sm">
+          <div class="card-body gap-5">
+            {error ? (
+              <p class="alert alert-error text-sm" role="alert">
+                Invalid email or password.
+              </p>
+            ) : null}
+
+            <form method="post" action="/api/login" class="flex w-full flex-col gap-4">
+              {next ? <input type="hidden" name="next" value={next} /> : null}
+              <Field id="email" label="Email">
+                <input
+                  id="email"
+                  type="email"
+                  name="email"
+                  class="input input-bordered w-full"
+                  autocomplete="email"
+                  required
+                />
+              </Field>
+              <Field id="password" label="Password">
+                <input
+                  id="password"
+                  type="password"
+                  name="password"
+                  class="input input-bordered w-full"
+                  autocomplete="current-password"
+                  required
+                />
+              </Field>
+              <button type="submit" class="btn btn-primary mt-1 w-full">
+                Sign in
+              </button>
+            </form>
+
+            <div class="divider my-0 text-xs text-base-content/45">or</div>
+            <a class="btn btn-ghost w-full" href="/device">
+              Sign in from a device
+            </a>
+            <p class="text-center text-sm text-base-content/55">
+              No account yet?{' '}
+              <a class="link link-hover" href="/register">
+                Create one
+              </a>{' '}
+              ·{' '}
+              <a class="link link-hover" href="/reset-password">
+                Forgot password?
+              </a>
+            </p>
+          </div>
+        </section>
+
+        <p class="text-center text-sm text-base-content/55">
+          <a class="link link-hover" href="/">
+            Back home
+          </a>
+        </p>
+      </div>
+    </Layout>
+  );
+}

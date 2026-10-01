@@ -1,0 +1,12 @@
+/**
+ * Project-local browser client surface.
+ *
+ * Thin re-export of the framework's client runtime entry (`jsails/client`). The
+ * browser entry imports from `../app/application-client.js`, so the
+ * `jsails/client` import lives in this one shim. `registerIsland` is re-exported
+ * too, so a project that adds an island imports it from here rather than from
+ * the framework subpath directly.
+ */
+
+export { registerIsland, startClient } from 'jsails/client';
+export type { IslandProps } from 'jsails/client';

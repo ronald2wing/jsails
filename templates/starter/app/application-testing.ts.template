@@ -1,0 +1,10 @@
+/**
+ * Project-local in-process testing surface.
+ *
+ * Thin re-export of the framework's testing entry (`jsails/testing`). Tests
+ * import these from `../app/application-testing.js` instead of `jsails/testing`,
+ * so the `jsails/testing` import lives in this one shim.
+ */
+
+export { createTestApp } from 'jsails/testing';
+export type { TestApplication } from 'jsails/testing';

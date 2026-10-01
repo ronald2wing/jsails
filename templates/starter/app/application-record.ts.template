@@ -1,0 +1,28 @@
+/**
+ * Project-local model base — a thin re-export of `jsails/models`.
+ *
+ * Import the base once and write a model as a class that declares only its
+ * shape; the compiler (`jsails build:meta`) derives the table, columns, foreign
+ * keys, and migrations from the class. TypeORM never appears in a model — no
+ * decorators, no subscriber, no `entities` entry.
+ *
+ * ```ts
+ * import { ApplicationRecord } from '../app/application-record.js';
+ *
+ * export class Post extends ApplicationRecord {
+ *   declare title: string;
+ *   declare author: Author;      // -> many-to-one; column author_id -> author
+ *   declare comments: Comment[]; // -> one-to-many (inverse)
+ * }
+ * ```
+ *
+ * Customize a field with an inline `@jsails.*` decorator when inference cannot
+ * know the intent (`@jsails.maxLength(200)`, `@jsails.unique()`,
+ * `@jsails.nullable()`, `@jsails.encrypts()`, `@jsails.belongsTo(Author)`).
+ *
+ * The base class carries no implicit connection: the compiler registers each
+ * model and the data source harvests that registry, so a model needs no
+ * hand-written `entities` entry or subscriber.
+ */
+
+export * from 'jsails/models';

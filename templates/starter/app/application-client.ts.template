@@ -1,0 +1,14 @@
+/**
+ * Project-local browser client surface.
+ *
+ * Thin re-export of the framework's client runtime entry (`jsails/client`) and
+ * the signal-backed model primitive (`jsails/client/model`). The browser entry
+ * imports these from `../app/application-client.js`, so the `jsails/*` imports
+ * live in this one shim.
+ */
+
+export { registerIsland, startClient } from 'jsails/client';
+export type { IslandProps } from 'jsails/client';
+
+export { createModel } from 'jsails/client/model';
+export type { Model, ModelDefinition, ModelFieldOptions } from 'jsails/client/model';

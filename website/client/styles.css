@@ -1,0 +1,961 @@
+/*
+ * JSails docs site styles.
+ *
+ * daisyUI-first: the shell (header, sidebar, menu, buttons, cards, search,
+ * theme toggle) is built from daisyUI 5 components + Tailwind 4 utilities in
+ * the page markup. This file carries only what daisyUI does not own:
+ *
+ *   1. the two daisyUI themes (`aqua` / `night`) with the indigo brand accent,
+ *   2. the Shiki dual-theme bridge (`html[data-theme="night"] .shiki`),
+ *   3. the `.prose` markdown surface (rendered HTML we do not control),
+ *   4. code-block chrome (filename bar, language badge, copy button),
+ *   5. a handful of small utilities the shell needs (scroll-spy, glow, grid).
+ *
+ * Theme names are `aqua` and `night`: the theme island flips
+ * `data-theme` between exactly those two string values, and daisyUI emits its
+ * theme blocks under `[data-theme="aqua"]` / `[data-theme="night"]`. That keeps
+ * the island, the `html[data-theme="night"]` Shiki hook, and the daisyUI themes
+ * all keyed on the same attribute.
+ *
+ * Brand: an indigo accent (`--color-primary`) on a near-white light surface and
+ * an indigo-tinted dark. Typography pairs an editorial serif display face with a
+ * clean system sans and a monospace for code; the serif has a full local
+ * fallback stack so an offline build still renders serif headings.
+ */
+
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes:
+    aqua --default,
+    night --prefersdark;
+}
+
+/* -------------------------------------------------------------------------- */
+/* daisyUI themes                                                             */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Light: the site's near-white surface with a faint indigo cast. `base-100` is
+ * the page background, `base-200` the raised surface, `base-300` the border and
+ * hairline tone, and `base-content` the ink. `primary` is the indigo brand
+ * accent; daisyUI derives `-content` pairs and the remaining component colors.
+ */
+@plugin "daisyui/theme" {
+  name: 'aqua';
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f7f7fb;
+  --color-base-300: #e6e6ef;
+  --color-base-content: #17172b;
+
+  --color-primary: #4f46e5;
+  --color-primary-content: #ffffff;
+  --color-secondary: #6366f1;
+  --color-secondary-content: #ffffff;
+  --color-accent: #4f46e5;
+  --color-accent-content: #ffffff;
+  --color-neutral: #17172b;
+  --color-neutral-content: #f8f8fc;
+
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+  --color-success: #1a7f5a;
+  --color-success-content: #ffffff;
+  --color-warning: #d97706;
+  --color-warning-content: #ffffff;
+  --color-error: #dc2626;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 999rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/*
+ * Dark: indigo-tinted warm dark, not neutral grey; the accent is lifted so it
+ * stays legible against the deep surface.
+ */
+@plugin "daisyui/theme" {
+  name: 'night';
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #0e0f13;
+  --color-base-200: #14151c;
+  --color-base-300: #262833;
+  --color-base-content: #e8e8f2;
+
+  --color-primary: #8b87ff;
+  --color-primary-content: #0e0f13;
+  --color-secondary: #a5a1ff;
+  --color-secondary-content: #0e0f13;
+  --color-accent: #8b87ff;
+  --color-accent-content: #0e0f13;
+  --color-neutral: #191a24;
+  --color-neutral-content: #e8e8f2;
+
+  --color-info: #60a5fa;
+  --color-info-content: #0e0f13;
+  --color-success: #7ee2b8;
+  --color-success-content: #0e0f13;
+  --color-warning: #fbbf24;
+  --color-warning-content: #0e0f13;
+  --color-error: #f87171;
+  --color-error-content: #0e0f13;
+
+  --radius-selector: 999rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Identity + layout tokens                                                   */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The `--jsails-*` brand layer, plus the local spacing scale, typography stacks,
+ * and shadows the prose/code rules below use. Each theme re-declares the scale
+ * (daisyUI theme blocks cannot carry non-color tokens that depend on the active
+ * theme), so both blocks share the same definitions.
+ */
+@layer base {
+  :root,
+  [data-theme='aqua'] {
+    /* Brand accent aliases over the active daisyUI theme. */
+    --jsails-accent: var(--color-primary);
+    --jsails-accent-hover: #4338ca;
+    --jsails-accent-strong: #3730a3;
+    --jsails-accent-soft: #eef2ff;
+    --jsails-accent-soft-border: #c7d2fe;
+
+    /* Text hierarchy. `faint` and `muted` are theme-derived mixes of the
+     * base ink so they track whichever theme is active. */
+    --color-text: var(--color-base-content);
+    --color-text-muted: color-mix(in srgb, var(--color-base-content) 72%, transparent);
+    --color-text-faint: color-mix(in srgb, var(--color-base-content) 50%, transparent);
+    --color-heading: var(--color-base-content);
+
+    --color-border-strong: color-mix(in srgb, var(--color-base-300) 78%, var(--color-base-content));
+
+    --color-chrome-bg: #f2f2f6;
+  }
+
+  [data-theme='night'] {
+    --jsails-accent: var(--color-primary);
+    --jsails-accent-hover: #a5a1ff;
+    --jsails-accent-strong: #c7c4ff;
+    --jsails-accent-soft: rgba(99, 91, 255, 0.16);
+    --jsails-accent-soft-border: rgba(139, 135, 255, 0.35);
+
+    --color-text: var(--color-base-content);
+    --color-text-muted: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+    --color-text-faint: color-mix(in srgb, var(--color-base-content) 46%, transparent);
+    --color-heading: var(--color-base-content);
+
+    --color-border-strong: color-mix(in srgb, var(--color-base-300) 70%, var(--color-base-content));
+
+    --color-chrome-bg: #1b1c26;
+  }
+
+  /*
+   * Mirror daisyUI's `--prefersdark` night base colors for the JSails identity
+   * tokens too. daisyUI emits the `night` base palette under
+   * `@media (prefers-color-scheme: dark)`, NOT under `[data-theme="night"]`; the
+   * SSR shell ships `data-theme="aqua"`, so a dark-OS user on the static export
+   * (or before the theme island hydrates) would otherwise get dark base colors
+   * while `--jsails-accent-strong` stayed the light-theme dark indigo — dark text
+   * on a dark page, the classic unreadable-blue-chip bug. Re-declaring the night
+   * identity tokens under the same media query keeps code chips consistent with
+   * the surrounding surface whenever the OS preference is dark, even while
+   * `data-theme` still reads `aqua`.
+   */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --jsails-accent: var(--color-primary);
+      --jsails-accent-hover: #a5a1ff;
+      --jsails-accent-strong: #c7c4ff;
+      --jsails-accent-soft: rgba(99, 91, 255, 0.16);
+      --jsails-accent-soft-border: rgba(139, 135, 255, 0.35);
+
+      --color-text: var(--color-base-content);
+      --color-text-muted: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+      --color-text-faint: color-mix(in srgb, var(--color-base-content) 46%, transparent);
+      --color-heading: var(--color-base-content);
+
+      --color-border-strong: color-mix(
+        in srgb,
+        var(--color-base-300) 70%,
+        var(--color-base-content)
+      );
+
+      --color-chrome-bg: #1b1c26;
+    }
+  }
+
+  :root {
+    /* Code chrome (traffic-light dots) — identical across themes. */
+    --color-chrome-dot-close: #ff5f57;
+    --color-chrome-dot-min: #febc2e;
+    --color-chrome-dot-max: #28c840;
+
+    /* Typography: serif display over a system sans; full local fallbacks so an
+     * offline build never depends on a network font. */
+    --font-sans:
+      system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', sans-serif;
+    --font-serif:
+      'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia,
+      'Times New Roman', serif;
+    --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+
+    --header-height: 60px;
+    --content-max: 72ch;
+    --toc-width: 232px;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+
+    --shadow-sm: 0 1px 2px rgba(16, 16, 36, 0.06);
+    --shadow-md: 0 6px 20px rgba(16, 16, 36, 0.09);
+    --shadow-lg: 0 18px 48px rgba(16, 16, 36, 0.16);
+    --shadow-glow: 0 20px 60px -24px rgba(79, 70, 229, 0.5);
+
+    --ring: 0 0 0 3px rgba(79, 70, 229, 0.35);
+
+    --transition-fast: 0.14s ease;
+    --transition-base: 0.22s ease;
+  }
+
+  [data-theme='night'] {
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 20px 52px rgba(0, 0, 0, 0.62);
+    --shadow-glow: 0 24px 70px -28px rgba(139, 135, 255, 0.55);
+
+    --ring: 0 0 0 3px rgba(139, 135, 255, 0.45);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shiki dual-theme CSS variable switching                                    */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * In dual-theme output with `defaultColor: false`, Shiki emits no inline `color`
+ * or `background-color` — only `--shiki-light`/`--shiki-dark` variables. The
+ * light theme sets the default (inline) prefix; the dark block overrides.
+ */
+html[data-theme='night'] .shiki,
+html[data-theme='night'] .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+/* Mirror the dark bridge under the OS preference too, matching daisyUI's
+ * `--prefersdark` night base colors: a dark-OS user on the static export (or
+ * before the theme island hydrates, while `data-theme` still reads `aqua`) must
+ * still get dark Shiki tokens over the dark surface, not light-on-white code. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme='aqua']) .shiki,
+  html:not([data-theme='aqua']) .shiki span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reset / base                                                               */
+/* -------------------------------------------------------------------------- */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--color-base-100);
+    color: var(--color-text);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Smooth the light/dark swap without animating layout. */
+    transition:
+      background-color var(--transition-base),
+      color var(--transition-base);
+  }
+
+  ::selection {
+    background: var(--jsails-accent-soft);
+    color: var(--jsails-accent-strong);
+  }
+
+  /* Visible keyboard focus everywhere; mouse clicks stay clean. */
+  :focus-visible {
+    outline: 2px solid var(--jsails-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Respect users who ask for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shell utilities (daisyUI gaps)                                             */
+/* -------------------------------------------------------------------------- */
+
+@layer components {
+  /* Skip link — hidden until focused. */
+  .skip-link {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1000;
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary-content);
+    background: var(--jsails-accent);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transform: translateY(-160%);
+    transition: transform var(--transition-fast);
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+
+  /* Brand wordmark — serif, with an accent diamond mark. */
+  .brand-mark {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    padding-left: 21px;
+    font-family: var(--font-serif);
+    font-size: 1.375rem;
+    font-weight: 600;
+    color: var(--color-heading);
+    text-decoration: none;
+    letter-spacing: -0.015em;
+  }
+
+  .brand-mark::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    transform: translateY(-50%) rotate(45deg);
+    background: linear-gradient(135deg, var(--jsails-accent), var(--jsails-accent-hover));
+    border-radius: 3px;
+    box-shadow: 0 0 0 3px var(--jsails-accent-soft);
+    transition: box-shadow var(--transition-base);
+  }
+
+  .brand-mark:hover {
+    color: var(--jsails-accent);
+  }
+
+  .brand-mark:hover::before {
+    box-shadow: 0 0 0 5px var(--jsails-accent-soft);
+  }
+
+  /* Primary top menu — quiet text links flanking the brand mark. */
+  .top-menu {
+    align-items: center;
+    gap: 4px;
+    margin-left: 18px;
+  }
+
+  .top-menu a {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    transition:
+      color var(--transition-fast),
+      background-color var(--transition-fast);
+  }
+
+  .top-menu a:hover {
+    color: var(--color-heading);
+    background: color-mix(in srgb, var(--color-base-200) 70%, transparent);
+  }
+
+  .top-menu a.top-menu-active {
+    color: var(--jsails-accent);
+    background: var(--jsails-accent-soft);
+    font-weight: 600;
+  }
+
+  /* Sticky, translucent header with a backdrop blur. */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: var(--header-height);
+    background: color-mix(in srgb, var(--color-base-100) 82%, transparent);
+    border-bottom: 1px solid var(--color-base-300);
+    backdrop-filter: saturate(1.6) blur(14px);
+    -webkit-backdrop-filter: saturate(1.6) blur(14px);
+  }
+
+  /* Sidebar scroll container — thin, theme-aware scrollbar. */
+  .sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 8px;
+    border: 2px solid var(--color-base-200);
+  }
+
+  /* daisyUI menu tuning: quiet items, accent active state, indented children. */
+  .docs-menu .menu-title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-faint);
+  }
+
+  .docs-menu li > a {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    border-radius: var(--radius-sm);
+    transition:
+      background var(--transition-fast),
+      color var(--transition-fast);
+  }
+
+  .docs-menu li > a:hover {
+    background: var(--color-base-100);
+    color: var(--color-text);
+  }
+
+  .docs-menu li > a.menu-active {
+    color: var(--jsails-accent-strong);
+    background: var(--jsails-accent-soft);
+    font-weight: 600;
+  }
+
+  /* On-this-page TOC — sticky rail with a scroll-spy accent. */
+  .toc-rail {
+    position: sticky;
+    top: calc(var(--header-height) + 48px);
+    width: var(--toc-width);
+    flex-shrink: 0;
+    max-height: calc(100vh - var(--header-height) - 64px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .toc-rail ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 1px solid var(--color-base-300);
+  }
+
+  .toc-rail a {
+    display: block;
+    padding: 5px 12px;
+    margin-left: -1px;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition:
+      color var(--transition-fast),
+      border-color var(--transition-fast);
+  }
+
+  .toc-rail a:hover {
+    color: var(--color-text);
+    border-left-color: var(--color-border-strong);
+  }
+
+  /* Scroll-spy active state, toggled by the search island's observer. */
+  .toc-rail a.toc-active {
+    color: var(--jsails-accent);
+    border-left-color: var(--jsails-accent);
+    font-weight: 600;
+  }
+
+  /* Hero glow + grid backdrop. */
+  .hero-glow::before {
+    content: '';
+    position: absolute;
+    inset: -40px -8vw 40px;
+    z-index: -1;
+    background:
+      radial-gradient(
+        60% 80% at 12% 0%,
+        color-mix(in srgb, var(--jsails-accent) 14%, transparent),
+        transparent 70%
+      ),
+      linear-gradient(var(--color-base-300) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-base-300) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      44px 44px,
+      44px 44px;
+    mask-image: linear-gradient(to bottom, #000, transparent 88%);
+    -webkit-mask-image: linear-gradient(to bottom, #000, transparent 88%);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  /* Terminal chrome for the hero quick-start. */
+  .terminal-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+  }
+
+  .terminal-dot-close {
+    background: var(--color-chrome-dot-close);
+  }
+
+  .terminal-dot-min {
+    background: var(--color-chrome-dot-min);
+  }
+
+  .terminal-dot-max {
+    background: var(--color-chrome-dot-max);
+  }
+
+  .tok-prompt {
+    color: var(--jsails-accent);
+  }
+
+  .tok-flag {
+    color: var(--color-success);
+  }
+
+  .tok-op {
+    color: var(--color-text-faint);
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /* Prose styling (rendered markdown)                                        */
+  /* ------------------------------------------------------------------------ */
+
+  .prose {
+    max-width: var(--content-max);
+    font-size: 1.0625rem;
+    line-height: 1.72;
+    color: var(--color-text);
+    word-wrap: break-word;
+  }
+
+  .prose > :first-child {
+    margin-top: 0;
+  }
+
+  /* Headings — editorial serif, tighter scale, strong hierarchy. */
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    font-family: var(--font-serif);
+    color: var(--color-heading);
+    font-weight: 600;
+    line-height: 1.22;
+    letter-spacing: -0.015em;
+    scroll-margin-top: calc(var(--header-height) + 24px);
+  }
+
+  .prose h1 {
+    font-size: 2.375rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    margin: 0 0 24px;
+  }
+
+  .prose h2 {
+    font-size: 1.6875rem;
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-base-300);
+  }
+
+  .prose h3 {
+    font-size: 1.3125rem;
+    margin: 36px 0 12px;
+  }
+
+  .prose h4 {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 28px 0 8px;
+    letter-spacing: 0;
+  }
+
+  /* Anchor hover affordance: heading anchors prepend a `#` on hover/focus. */
+  .prose :is(h2, h3, h4) > a.anchor,
+  .prose :is(h2, h3, h4):hover > a.anchor {
+    color: var(--jsails-accent);
+  }
+
+  .prose :is(h2, h3, h4) :is(a.header-anchor, a.anchor) {
+    float: left;
+    margin-left: -1.1em;
+    padding-right: 0.35em;
+    opacity: 0;
+    color: var(--color-text-faint);
+    text-decoration: none;
+    transition: opacity var(--transition-fast);
+  }
+
+  .prose :is(h2, h3, h4):hover :is(a.header-anchor, a.anchor),
+  .prose :is(h2, h3, h4) :is(a.header-anchor, a.anchor):focus-visible {
+    opacity: 1;
+  }
+
+  .prose p {
+    margin: 0 0 20px;
+  }
+
+  .prose a {
+    color: var(--jsails-accent);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px solid transparent;
+    transition:
+      color var(--transition-fast),
+      border-color var(--transition-fast);
+  }
+
+  .prose a:hover {
+    color: var(--jsails-accent-hover);
+    border-bottom-color: currentColor;
+  }
+
+  .prose strong {
+    font-weight: 700;
+    color: var(--color-heading);
+  }
+
+  .prose ul,
+  .prose ol {
+    margin: 0 0 20px;
+    padding-left: 26px;
+  }
+
+  .prose li {
+    margin-bottom: 7px;
+  }
+
+  .prose li::marker {
+    color: var(--color-text-faint);
+  }
+
+  .prose li > ul,
+  .prose li > ol {
+    margin-top: 7px;
+    margin-bottom: 0;
+  }
+
+  /* Blockquotes double as callouts: accent border, tinted surface. */
+  .prose blockquote {
+    margin: 0 0 22px;
+    padding: 14px 20px;
+    color: var(--color-text-muted);
+    background: var(--color-base-200);
+    border-left: 3px solid var(--jsails-accent);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  }
+
+  .prose blockquote > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* Inline code — tinted, subtly bordered, never confusable with links. The
+   * ink is `--jsails-accent-strong`, which each theme (and the dark media query
+   * above) sets to a legible value over its own `--jsails-accent-soft` pill, so
+   * no separate dark override is needed here. */
+  .prose :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    padding: 0.15em 0.4em;
+    color: var(--jsails-accent-strong);
+    background: var(--jsails-accent-soft);
+    border: 1px solid var(--jsails-accent-soft-border);
+    border-radius: var(--radius-sm);
+    word-break: break-word;
+  }
+
+  /* Code blocks — a chrome header bar over the scrollable body. The chrome
+   * (traffic lights, filename, language badge) is drawn by pseudo-elements and
+   * the copy button is injected client-side by the search island. The frame
+   * never scrolls horizontally — the inner `code` does — so the chrome stays
+   * fixed while long lines move. */
+  .prose pre {
+    position: relative;
+    margin: 0 0 24px;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-lg);
+    background: var(--color-base-200);
+    overflow: hidden;
+    padding: 0;
+  }
+
+  /* Chrome bar. */
+  .prose pre::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 38px;
+    background: var(--color-chrome-bg);
+    border-bottom: 1px solid var(--color-base-300);
+  }
+
+  /* Traffic lights, drawn as three radial gradients so they need no extra DOM. */
+  .prose pre::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 38px;
+    width: 62px;
+    background-image:
+      radial-gradient(circle at 14px 19px, var(--color-chrome-dot-close) 4.5px, transparent 4.8px),
+      radial-gradient(circle at 30px 19px, var(--color-chrome-dot-min) 4.5px, transparent 4.8px),
+      radial-gradient(circle at 46px 19px, var(--color-chrome-dot-max) 4.5px, transparent 4.8px);
+    background-repeat: no-repeat;
+  }
+
+  /* Copy affordance — injected into the chrome bar by the search island and
+   * wired to the clipboard through its delegated click handler. */
+  .prose pre .code-copy {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 9px;
+    appearance: none;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-faint);
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    user-select: none;
+    transition:
+      color var(--transition-fast),
+      border-color var(--transition-fast),
+      background var(--transition-fast);
+  }
+
+  .prose pre .code-copy:focus-visible {
+    outline: 2px solid var(--jsails-accent);
+    outline-offset: 2px;
+  }
+
+  .prose pre .code-copy:hover {
+    color: var(--jsails-accent);
+    border-color: var(--jsails-accent-soft-border);
+    background: var(--jsails-accent-soft);
+  }
+
+  .prose pre .code-copy[data-copied='true'] {
+    color: var(--color-primary-content);
+    background: var(--jsails-accent);
+    border-color: var(--jsails-accent);
+  }
+
+  /* Below the chrome, code scrolls horizontally. */
+  .prose pre code {
+    display: block;
+    padding: 0;
+    min-width: max-content;
+    border: none;
+    background: none;
+    color: inherit;
+    font-size: 0.8125rem;
+  }
+
+  .prose .shiki {
+    padding: 38px 0 0;
+    margin: 0 0 24px;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-lg);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    overflow: hidden;
+  }
+
+  .prose .shiki code {
+    display: block;
+    min-width: max-content;
+    padding: 18px 20px;
+  }
+
+  .prose pre:not(.shiki) {
+    padding: 38px 0 0;
+  }
+
+  .prose pre:not(.shiki) code {
+    display: block;
+    padding: 18px 20px;
+    min-width: max-content;
+    line-height: 1.6;
+  }
+
+  /* Tables — bordered cards with a tinted header row. */
+  .prose table {
+    width: 100%;
+    margin: 0 0 22px;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+    display: block;
+    overflow-x: auto;
+  }
+
+  .prose thead {
+    background: var(--color-base-200);
+  }
+
+  .prose th,
+  .prose td {
+    padding: 10px 14px;
+    border: 1px solid var(--color-base-300);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .prose th {
+    font-weight: 600;
+    color: var(--color-heading);
+    white-space: nowrap;
+  }
+
+  .prose tbody tr:nth-child(even) {
+    background: color-mix(in srgb, var(--color-base-200) 55%, transparent);
+  }
+
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-base-300);
+  }
+
+  .prose hr {
+    margin: 40px 0;
+    border: none;
+    border-top: 1px solid var(--color-base-300);
+  }
+
+  /* `:target` highlight — a passed anchor briefly marks its heading. */
+  .prose :is(h1, h2, h3, h4, li, blockquote):target {
+    background: var(--jsails-accent-soft);
+    border-radius: var(--radius-sm);
+    box-shadow:
+      -6px 0 0 var(--jsails-accent-soft),
+      6px 0 0 var(--jsails-accent-soft);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive                                                                 */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .toc-rail {
+    width: 200px;
+  }
+}
+
+@media (max-width: 900px) {
+  /* The on-this-page TOC collapses below the article once space is tight. */
+  .toc-rail {
+    position: static;
+    width: 100%;
+    max-height: none;
+    order: 2;
+  }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --header-height: 56px;
+  }
+
+  .brand-mark {
+    font-size: 1.1875rem;
+  }
+
+  .prose h1 {
+    font-size: 1.875rem;
+  }
+
+  .prose h2 {
+    font-size: 1.4375rem;
+  }
+}
