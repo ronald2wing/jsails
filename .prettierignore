@@ -1,0 +1,10 @@
+dist
+node_modules
+coverage
+test-results
+playwright-report
+out
+package-lock.json
+*.template
+templates/**/*.template
+*.md

@@ -1,0 +1,132 @@
+/**
+ * Browser-test fixtures for the generated starter.
+ *
+ * Extends the Playwright `test` with:
+ * - `gotoHydrated(page, path?)` — navigate and wait until the client counter
+ *   island has hydrated (`#counter-root[data-hydrated="true"]`).
+ * - an automatic fixture that, when a test fails unexpectedly, attaches a
+ *   bounded JSON report of console errors, uncaught page errors, and failed
+ *   requests through `testInfo.outputPath` / `testInfo.attach`.
+ *
+ * Privacy: the report never collects headers, bodies, cookies, or storage. URLs
+ * have credentials, query strings, and fragments removed, and `data:` URLs are
+ * reduced to a placeholder. Console and page-error text is truncated but is not
+ * guaranteed to be secret-free — it may echo application or test data.
+ */
+
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
+import { expect, test as base } from '@playwright/test';
+import type { Page, TestInfo } from '@playwright/test';
+
+export { expect };
+
+/** Selector for the counter root once the client entry has hydrated it. */
+export const HYDRATED_ROOT = '#counter-root[data-hydrated="true"]';
+
+/** Navigate to `path` and wait until the counter island has hydrated. */
+export async function gotoHydrated(page: Page, path = '/'): Promise<void> {
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator(HYDRATED_ROOT)).toBeVisible();
+}
+
+/** Cap collected diagnostics so a noisy page cannot produce an unbounded file. */
+const MAX_ENTRIES = 25;
+const MAX_TEXT_LENGTH = 2000;
+
+interface FailedRequest {
+  method: string;
+  url: string;
+  failure: string;
+}
+
+interface DiagnosticsCollector {
+  attach(testInfo: TestInfo): Promise<void>;
+}
+
+/** Truncate a message to a bounded length. */
+function truncate(text: string): string {
+  return text.length > MAX_TEXT_LENGTH
+    ? `${text.slice(0, MAX_TEXT_LENGTH)}...[truncated]`
+    : text;
+}
+
+/** Remove credentials, query string, and fragment; drop `data:` payloads. */
+function sanitizeUrl(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return '<unparseable-url>';
+  }
+  if (url.protocol === 'data:') return '<data-url>';
+  url.username = '';
+  url.password = '';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
+
+/** Subscribe to page diagnostics and collect them until the test ends. */
+function collectDiagnostics(page: Page): DiagnosticsCollector {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  const failedRequests: FailedRequest[] = [];
+  let truncated = false;
+
+  const record = <T>(list: T[], entry: T): void => {
+    if (list.length < MAX_ENTRIES) list.push(entry);
+    else truncated = true;
+  };
+
+  page.on('console', (message) => {
+    if (message.type() === 'error') record(consoleErrors, truncate(message.text()));
+  });
+  page.on('pageerror', (error) => {
+    record(pageErrors, truncate(error.message));
+  });
+  page.on('requestfailed', (request) => {
+    record(failedRequests, {
+      method: request.method(),
+      url: sanitizeUrl(request.url()),
+      failure: request.failure()?.errorText ?? 'unknown',
+    });
+  });
+
+  return {
+    async attach(testInfo) {
+      const body = JSON.stringify(
+        {
+          note: 'Credentials, query, and hash are removed from URLs; error text may contain application or test data.',
+          truncated,
+          consoleErrors,
+          pageErrors,
+          failedRequests,
+        },
+        null,
+        2,
+      );
+      const file = testInfo.outputPath('browser-diagnostics.json');
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, body, 'utf8');
+      await testInfo.attach('browser-diagnostics', {
+        path: file,
+        contentType: 'application/json',
+      });
+    },
+  };
+}
+
+export const test = base.extend<{ browserDiagnostics: void }>({
+  browserDiagnostics: [
+    async ({ page }, use, testInfo) => {
+      const diagnostics = collectDiagnostics(page);
+      await use();
+      if (testInfo.status !== testInfo.expectedStatus) {
+        await diagnostics.attach(testInfo);
+      }
+    },
+    { auto: true },
+  ],
+});

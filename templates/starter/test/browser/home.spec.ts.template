@@ -1,0 +1,355 @@
+/**
+ * End-to-end journeys for the generated starter.
+ *
+ * The counter is a manually hydrated island whose state is local to the page,
+ * the dialog is native `<dialog>` state, and the task list is a live server
+ * component backed by a signed snapshot. These tests drive the real app in a
+ * real browser against an isolated local server; nothing is mocked and no
+ * external network is touched.
+ *
+ * Navigation is owned by Turbo Drive: an ordinary link is a soft navigation
+ * (the document object survives), while a `data-turbo="false"` link or a
+ * modifier-click falls through to a normal browser navigation.
+ */
+
+import type { Page } from '@playwright/test';
+
+import { expect, gotoHydrated, HYDRATED_ROOT, test } from './fixtures.js';
+
+/** The counter's current-value element, as marked by the counter component. */
+function counterValue(page: Page) {
+  return page.locator('[data-counter-value]');
+}
+
+/** The task-list server-component root, as marked by the runtime. */
+function tasksComponentRoot(page: Page) {
+  return page.locator('[data-jsails-component="task-list"]');
+}
+
+/**
+ * Navigate to the tasks page and wait until both the counter island and the
+ * task-list component root have been bound by the client runtime.
+ */
+async function gotoTasksHydrated(page: Page) {
+  await gotoHydrated(page, '/tasks');
+  await expect(tasksComponentRoot(page)).toHaveAttribute('data-hydrated', 'true');
+}
+
+/**
+ * Key stashed on `window` to detect a full document reload. A Turbo soft
+ * navigation swaps only the `<body>`, so the `window` object (and this marker)
+ * survives; a normal navigation or reload replaces the document and drops it.
+ */
+const SENTINEL_KEY = '__jsailsNavSentinel';
+
+/** Stash the window-scoped navigation marker. */
+async function stampSentinel(page: Page): Promise<void> {
+  await page.evaluate((key) => {
+    (globalThis as Record<string, unknown>)[key] = 'alive';
+  }, SENTINEL_KEY);
+}
+
+/** Read the window-scoped navigation marker; `undefined` after a full reload. */
+function readSentinel(page: Page): Promise<unknown> {
+  return page.evaluate((key) => (globalThis as Record<string, unknown>)[key], SENTINEL_KEY);
+}
+
+/** A deferred void promise: `promise` settles when `resolve` is called. */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+test('counter increments through 1 and 2, then resets on reload', async ({ page }) => {
+  await test.step('open the home page and wait for hydration', async () => {
+    await gotoHydrated(page);
+  });
+
+  await test.step('the counter starts at 0', async () => {
+    await expect(counterValue(page)).toHaveText('0');
+  });
+
+  await test.step('incrementing twice reaches 1, then 2', async () => {
+    await page.locator('[data-counter-increment]').click();
+    await expect(counterValue(page)).toHaveText('1');
+    await page.locator('[data-counter-increment]').click();
+    await expect(counterValue(page)).toHaveText('2');
+  });
+
+  await test.step('reloading resets the counter to 0', async () => {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator(HYDRATED_ROOT)).toBeVisible();
+    await expect(counterValue(page)).toHaveText('0');
+  });
+});
+
+test('dialog opens, closes on Escape, and closes with the button', async ({ page }) => {
+  await test.step('open the home page and wait for hydration', async () => {
+    await gotoHydrated(page);
+  });
+
+  const dialog = page.locator('dialog');
+  const openButton = page.locator('[data-open-dialog]');
+  const closeButton = page.locator('[data-close-dialog]');
+
+  await test.step('the dialog starts closed', async () => {
+    await expect(dialog).not.toBeVisible();
+  });
+
+  await test.step('the open button shows the dialog', async () => {
+    await openButton.click();
+    await expect(dialog).toBeVisible();
+  });
+
+  await test.step('Escape closes the dialog and restores focus to the opener', async () => {
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(openButton).toBeFocused();
+  });
+
+  await test.step('the close button closes the dialog', async () => {
+    await openButton.click();
+    await expect(dialog).toBeVisible();
+    await closeButton.click();
+    await expect(dialog).not.toBeVisible();
+  });
+});
+
+test('home and about navigate as soft navigations and back restores the counter', async ({ page }) => {
+  await test.step('open the home page and increment once', async () => {
+    await gotoHydrated(page);
+    await page.locator('[data-counter-increment]').click();
+    await expect(counterValue(page)).toHaveText('1');
+  });
+
+  await test.step('mark the window before navigating', async () => {
+    await stampSentinel(page);
+  });
+
+  await test.step('the About link is a soft navigation', async () => {
+    await page.locator('nav a[href="/about"]').click();
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(page.locator('h1')).toHaveText('About');
+    // A soft navigation never replaced the document, so the marker survives.
+    expect(await readSentinel(page)).toBe('alive');
+  });
+
+  await test.step('back restores home and re-hydrates the counter at 0', async () => {
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator(HYDRATED_ROOT)).toBeVisible();
+    await expect(counterValue(page)).toHaveText('0');
+  });
+
+  await test.step('the counter still works after returning', async () => {
+    await page.locator('[data-counter-increment]').click();
+    await expect(counterValue(page)).toHaveText('1');
+  });
+});
+
+test('adding a task updates the list, clears the input, and preserves the counter', async ({ page }) => {
+  await test.step('open the tasks page and increment the counter once', async () => {
+    await gotoTasksHydrated(page);
+    await page.locator('[data-counter-increment]').click();
+    await expect(counterValue(page)).toHaveText('1');
+  });
+
+  await test.step('mark the window before submitting', async () => {
+    await stampSentinel(page);
+  });
+
+  await test.step('submit a task and see it appear', async () => {
+    await page.locator('[data-task-input]').fill('First task');
+    await page.locator('[data-task-submit]').click();
+    await expect(page.locator('[data-task-item]')).toHaveCount(1);
+    await expect(page.locator('[data-task-item]')).toHaveText('First task');
+  });
+
+  await test.step('the input clears and the page never reloaded', async () => {
+    await expect(page.locator('[data-task-input]')).toHaveValue('');
+    // The counter island sits outside the component root, so the morph that
+    // re-rendered the list left its local value untouched.
+    await expect(counterValue(page)).toHaveText('1');
+    expect(await readSentinel(page)).toBe('alive');
+  });
+});
+
+test('a blank task shows a validation error without adding an item', async ({ page }) => {
+  await test.step('open the tasks page', async () => {
+    await gotoTasksHydrated(page);
+  });
+
+  await test.step('submit a whitespace-only title', async () => {
+    await page.locator('[data-task-input]').fill('   ');
+    await page.locator('[data-task-submit]').click();
+  });
+
+  await test.step('the error is shown and no item is added', async () => {
+    await expect(page.locator('[data-task-error]')).toBeVisible();
+    await expect(page.locator('[data-task-item]')).toHaveCount(0);
+  });
+});
+
+test('a newer edit made while an update is in flight survives the morph', async ({ page }) => {
+  await test.step('open the tasks page', async () => {
+    await gotoTasksHydrated(page);
+  });
+
+  await test.step('hold the first update response so a newer edit can land mid-flight', async () => {
+    const held = deferred();
+    await page.route('**/_jsails/components/update', async (route) => {
+      const response = await route.fetch();
+      await held.promise;
+      await route.fulfill({ response });
+    });
+
+    await page.locator('[data-task-input]').fill('first');
+    await page.locator('[data-task-submit]').click();
+
+    // While the first update is still in flight, type a newer value into the
+    // same field. This edit has a higher revision and must survive the morph.
+    await page.locator('[data-task-input]').fill('newer');
+
+    held.resolve();
+
+    await expect(page.locator('[data-task-item]')).toHaveCount(1);
+    await expect(page.locator('[data-task-item]')).toHaveText('first');
+    await expect(page.locator('[data-task-input]')).toHaveValue('newer');
+  });
+});
+
+test('a data-turbo=false link forces a full navigation', async ({ page }) => {
+  await test.step('open the home page and mark the window', async () => {
+    await gotoHydrated(page);
+    await stampSentinel(page);
+  });
+
+  await test.step('inject a link Turbo must not intercept', async () => {
+    await page.evaluate(() => {
+      const link = document.createElement('a');
+      link.href = '/about';
+      link.id = 'full-reload-link';
+      link.textContent = 'Full reload to About';
+      link.dataset.turbo = 'false';
+      document.body.appendChild(link);
+    });
+  });
+
+  await test.step('the link performs a full document navigation', async () => {
+    await page.locator('#full-reload-link').click();
+    await expect(page).toHaveURL(/\/about$/);
+    // A full navigation replaced the document, so the window marker is gone.
+    expect(await readSentinel(page)).toBeUndefined();
+  });
+});
+
+/**
+ * Shape of the navigation probe installed on `window` before a modified click.
+ * `click` is filled in by a microtask after the click's synchronous dispatch,
+ * so it reflects the final `defaultPrevented` decision made by every listener
+ * (including Turbo Drive's).
+ */
+interface ModifiedClickProbe {
+  click: {
+    defaultPrevented: boolean;
+    button: number;
+    ctrlKey: boolean;
+    metaKey: boolean;
+  } | null;
+  beforeVisit: number;
+  visit: number;
+}
+
+/** Window key for the modified-click probe. */
+const MODIFIED_CLICK_PROBE_KEY = '__jsailsModifiedClickProbe';
+
+/** Bound on how long to wait for an optional new tab before proceeding. */
+const POPUP_OBSERVE_TIMEOUT_MS = 2000;
+
+test('a modified click is left to the browser and never soft-navigates the current page', async ({ page }) => {
+  await test.step('open the home page, increment, and mark the window', async () => {
+    await gotoHydrated(page);
+    await page.locator('[data-counter-increment]').click();
+    await expect(counterValue(page)).toHaveText('1');
+    await stampSentinel(page);
+  });
+
+  await test.step('install a probe for Turbo events and the real click decision', async () => {
+    await page.evaluate((key) => {
+      const state: ModifiedClickProbe = { click: null, beforeVisit: 0, visit: 0 };
+      (globalThis as Record<string, unknown>)[key] = state;
+
+      document.addEventListener('turbo:before-visit', () => {
+        state.beforeVisit += 1;
+      });
+      document.addEventListener('turbo:visit', () => {
+        state.visit += 1;
+      });
+
+      // Turbo decides synchronously whether to take over a click. A microtask
+      // scheduled from the click listener runs after every synchronous listener
+      // (Turbo's included) has finished, so `defaultPrevented` is final here.
+      document.addEventListener('click', (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        const target = event.target;
+        if (!(target instanceof Element) || target.closest('nav a[href="/about"]') === null) {
+          return;
+        }
+        queueMicrotask(() => {
+          state.click = {
+            defaultPrevented: event.defaultPrevented,
+            button: event.button,
+            ctrlKey: event.ctrlKey,
+            metaKey: event.metaKey,
+          };
+        });
+      });
+    }, MODIFIED_CLICK_PROBE_KEY);
+  });
+
+  await test.step('a real Ctrl-click is not intercepted by Turbo Drive', async () => {
+    // Headless Chromium does not reliably open a tab for a modified click, so
+    // a new tab is optional: observe and close one if it appears, but never
+    // require it. The guarantee under test is that Turbo leaves the click to
+    // the browser instead of soft-navigating the current document.
+    const popupPromise = page
+      .waitForEvent('popup', { timeout: POPUP_OBSERVE_TIMEOUT_MS })
+      .catch(() => null);
+
+    await page.locator('nav a[href="/about"]').click({ modifiers: ['Control'] });
+
+    const popup = await popupPromise;
+    if (popup !== null) {
+      await expect(popup).toHaveURL(/\/about$/);
+      await popup.close();
+    }
+
+    const probe = (await page.evaluate(
+      (key) => (globalThis as Record<string, unknown>)[key],
+      MODIFIED_CLICK_PROBE_KEY,
+    )) as ModifiedClickProbe;
+
+    expect(probe.click).not.toBeNull();
+    expect(probe.click?.ctrlKey || probe.click?.metaKey).toBe(true);
+    expect(probe.click?.button).toBe(0);
+    // Turbo calls preventDefault only when it takes over the click.
+    expect(probe.click?.defaultPrevented).toBe(false);
+    // No soft navigation was started for this click.
+    expect(probe.beforeVisit).toBe(0);
+    expect(probe.visit).toBe(0);
+  });
+
+  await test.step('the current page was not disturbed', async () => {
+    await expect(page).toHaveURL(/\/$/);
+    await expect(counterValue(page)).toHaveText('1');
+    expect(await readSentinel(page)).toBe('alive');
+
+    // Close only pages this test may have opened; the original page stays.
+    for (const other of page.context().pages()) {
+      if (other !== page) await other.close();
+    }
+  });
+});

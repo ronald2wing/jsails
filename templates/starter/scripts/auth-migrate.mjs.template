@@ -1,0 +1,55 @@
+// Apply the Better Auth schema migrations to the configured SQLite database.
+//
+// Usage: node scripts/auth-migrate.mjs
+//
+// This script requires the compiled auth module (`dist/auth/better-auth.js`),
+// which `npm run build` produces (`tsc -p tsconfig.json` compiles
+// `auth/better-auth.ts`). It uses the same environment variables the app does
+// (`AUTH_DATABASE_FILE`, `BETTER_AUTH_SECRET`/`AUTH_SECRET`, `BETTER_AUTH_URL`),
+// so run it with the same environment the app will use.
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { getMigrations } from 'better-auth/db/migration';
+
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const compiledAuth = resolve(projectRoot, 'dist', 'auth', 'better-auth.js');
+
+if (!existsSync(compiledAuth)) {
+  console.error(
+    `Missing build output: ${compiledAuth} does not exist.\n` +
+      'Run "npm run build" first (tsc -p tsconfig.json compiles auth/better-auth.ts).',
+  );
+  process.exit(1);
+}
+
+// Imported dynamically only after the file is known to exist, so a missing
+// build fails with a clear message instead of a bare module-not-found error.
+const { createAuth } = await import(compiledAuth);
+
+const auth = createAuth();
+
+console.log('Computing Better Auth schema migrations...');
+const migrations = await getMigrations(auth.options);
+
+for (const table of migrations.toBeCreated) {
+  console.log(`  create table ${table.table}`);
+}
+for (const table of migrations.toBeAdded) {
+  console.log(`  alter table ${table.table}`);
+}
+for (const index of migrations.toBeAddedIndexes) {
+  console.log(`  add index ${index.name} on ${index.table}`);
+}
+
+for (const problem of migrations.schemaProblems) {
+  console.warn(`  schema problem: ${problem}`);
+}
+for (const unsafe of migrations.unsafeChanges) {
+  console.warn(`  unsafe change: ${unsafe}`);
+}
+
+await migrations.runMigrations();
+
+console.log('Migrations applied.');

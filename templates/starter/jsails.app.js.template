@@ -1,0 +1,19 @@
+import { serverComponents } from 'jsails/server-components';
+
+import { taskList } from './dist/components/task-list.js';
+
+export default {
+  rootDir: '.',
+  pages: 'dist/pages',
+  api: 'dist/api',
+  public: 'public',
+  out: 'out',
+  host: '127.0.0.1',
+  port: Number(process.env.PORT ?? 3000),
+  extensions: [
+    // No signing key is hardcoded. In development/test the extension mints an
+    // ephemeral key; a plain `jsails serve` outside those environments requires
+    // JSAILS_COMPONENT_SECRET (>= 32 bytes) or the live render fails closed.
+    serverComponents({ components: { 'task-list': taskList } }),
+  ],
+};

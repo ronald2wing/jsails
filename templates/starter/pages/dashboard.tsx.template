@@ -1,0 +1,98 @@
+/**
+ * Starter dashboard page (auth variant).
+ *
+ * Pages are not covered by the global `authorize`, so this page always renders;
+ * it derives its state from the server-side session instead. When
+ * `context.session` is null it shows a signed-out prompt with a sign-in link;
+ * otherwise it shows the user's name and email beside a sign-out form.
+ *
+ * The user view is deliberately narrow: `load` projects only `id`, `name`, and
+ * `email` out of `context.session.data.user`, so nothing else in the session
+ * data can leak into the page. No client SDK and no secret is used here — the
+ * sign-out form is a plain POST to `/api/logout`.
+ *
+ * Stable `data-*` markers are the browser-verification contract:
+ * - `data-signed-out` — present on the prompt when no session is active
+ * - `data-user-email` — the signed-in user's email
+ */
+
+import type { RequestContext } from 'jsails';
+
+import { Layout, loadLayout, type LayoutAssets } from '../ui/layout.js';
+
+/** The only session fields surfaced to this page. */
+export interface UserView {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface DashboardPageProps {
+  /** The signed-in user's id/name/email, or null when signed out. */
+  user: UserView | null;
+  /** Resolved asset URLs, produced in `load` and forwarded to the layout. */
+  assets?: LayoutAssets;
+}
+
+/**
+ * Narrow an unknown session value to a safe user view (id/name/email only).
+ * Returns null for anything that is not an object carrying all three strings.
+ */
+function toUserView(value: unknown): UserView | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const { id, name, email } = record;
+  if (typeof id !== 'string' || typeof name !== 'string' || typeof email !== 'string') {
+    return null;
+  }
+  return { id, name, email };
+}
+
+export async function load(context: RequestContext): Promise<DashboardPageProps> {
+  const session = context.session;
+  const user = session === null ? null : toUserView(session.data.user ?? null);
+  return { user, assets: await loadLayout(context) };
+}
+
+export default function DashboardPage({ user, assets }: DashboardPageProps) {
+  return (
+    <Layout title="Dashboard — JSails Starter" assets={assets}>
+      <header class="text-center">
+        <h1 class="text-4xl font-bold tracking-tight">Dashboard</h1>
+        <p class="mt-2 text-base-content/70">
+          Signed-in state, derived from the server-side session.
+        </p>
+      </header>
+
+      {user === null ? (
+        <section class="card w-full bg-base-100 shadow-xl" data-signed-out>
+          <div class="card-body items-center text-center">
+            <h2 class="card-title">You are signed out</h2>
+            <p class="text-base-content/70">Sign in to see your account.</p>
+            <div class="card-actions">
+              <a class="btn btn-primary" href="/login">
+                Sign in
+              </a>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section class="card w-full bg-base-100 shadow-xl">
+          <div class="card-body">
+            <h2 class="card-title">{user.name}</h2>
+            <p class="text-base-content/70" data-user-email>
+              {user.email}
+            </p>
+            <div class="card-actions">
+              <form method="post" action="/api/logout">
+                <button type="submit" class="btn btn-outline">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+      )}
+    </Layout>
+  );
+}

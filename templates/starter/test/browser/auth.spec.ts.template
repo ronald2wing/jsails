@@ -1,0 +1,65 @@
+/**
+ * End-to-end auth journey for the generated starter's auth variant.
+ *
+ * Drives the real app in a real browser against an isolated local server. The
+ * account is seeded by the environment (AUTH_TEST_EMAIL / AUTH_TEST_PASSWORD),
+ * so these specs need no client SDK and touch no external network: the login
+ * form posts to the server's `/api/login` route, which verifies the account
+ * server-side. Seed the account first (see `auth/README.md`) and export the two
+ * variables before running `npm run test:browser`.
+ *
+ * The counter island is not mounted on the login/dashboard pages, so these
+ * specs navigate with `page.goto` and wait on page-specific markers instead of
+ * the counter hydration helper in `fixtures.ts`.
+ */
+
+import type { Page } from '@playwright/test';
+
+import { expect, test } from './fixtures.js';
+
+/** Resolve the seeded account, failing loudly when the environment is missing. */
+function seededUser(): { email: string; password: string } {
+  const email = process.env.AUTH_TEST_EMAIL;
+  const password = process.env.AUTH_TEST_PASSWORD;
+  if (email === undefined || email === '') {
+    throw new Error('AUTH_TEST_EMAIL is required to run the auth browser tests');
+  }
+  if (password === undefined || password === '') {
+    throw new Error('AUTH_TEST_PASSWORD is required to run the auth browser tests');
+  }
+  return { email, password };
+}
+
+/** Navigate to an auth page and wait for its distinctive marker to be visible. */
+async function gotoAuth(page: Page, path: string, marker: string): Promise<void> {
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator(marker)).toBeVisible();
+}
+
+test('signed-out dashboard, sign in, and sign out', async ({ page }) => {
+  const { email, password } = seededUser();
+
+  await test.step('the dashboard shows the signed-out prompt', async () => {
+    await gotoAuth(page, '/dashboard', '[data-signed-out]');
+  });
+
+  await test.step('the login form signs in the seeded user', async () => {
+    await gotoAuth(page, '/login', 'form[action="/api/login"]');
+    await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="password"]').fill(password);
+    await page.locator('form[action="/api/login"] button[type="submit"]').click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
+  await test.step('the dashboard shows the signed-in user', async () => {
+    await expect(page.locator('[data-user-email]')).toHaveText(email);
+  });
+
+  await test.step('signing out returns to the signed-out state', async () => {
+    await page.locator('form[action="/api/logout"] button[type="submit"]').click();
+    // The logout route redirects; re-visit the dashboard to confirm the session
+    // is gone regardless of the redirect target.
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-signed-out]')).toBeVisible();
+  });
+});

@@ -1,0 +1,76 @@
+import { serverComponents } from 'jsails/server-components';
+
+import {
+  createAuth,
+  resolveSessionFromRequest,
+} from './dist/auth/better-auth.js';
+import { handleDeviceAction, handleLogin, handleLogout } from './dist/auth/routes.js';
+import { taskList } from './dist/components/task-list.js';
+
+// One shared Better Auth instance for the app and the auth route handlers. The
+// secret comes from BETTER_AUTH_SECRET (or AUTH_SECRET); Better Auth fails in
+// production without one, and JSails does not invent a fallback. See
+// `.env.auth.example` for the variables (JSails never auto-loads `.env`).
+const auth = createAuth();
+
+// Optional public origin for the login/logout same-origin checks. Behind a
+// TLS-terminating proxy the request URL is plain HTTP, so set PUBLIC_ORIGIN to
+// the public HTTPS origin; when unset the handlers fall back to each request's
+// own origin.
+const publicOrigin = process.env.PUBLIC_ORIGIN;
+
+const authExtension = {
+  name: 'auth',
+  setup({ configureHttp }) {
+    // Mount the Better Auth HTTP surface (base path `/api/auth`) directly onto
+    // the app. This hook route is trusted code: it is NOT covered by the
+    // filesystem API default-deny pipeline, and Better Auth owns its own
+    // origin/CSRF checks.
+    configureHttp((app) => {
+      app.all('/api/auth/*', (c) => auth.handler(c.req.raw));
+
+      // Login and logout are also trusted hook routes, not filesystem API
+      // routes: mounting them here bypasses the default-deny `authorize` and
+      // the session CSRF middleware, so a plain form POST works even while a
+      // session cookie is present. Each handler owns its same-origin check
+      // (`publicOrigin` when configured, else the request URL origin).
+      app.post('/api/login', (c) => handleLogin(c.req.raw, auth, publicOrigin));
+      app.post('/api/logout', (c) => handleLogout(c.req.raw, auth, publicOrigin));
+
+      // Device approval (RFC 8628) is also a trusted hook route: the `/device`
+      // page's approve/deny forms POST here while a session cookie is present,
+      // so mounting through the extension bypasses the default-deny `authorize`
+      // and the session CSRF middleware. `handleDeviceAction` owns its
+      // same-origin check; the two paths are aliases and the `action` form field
+      // decides approve vs deny.
+      app.post('/api/device/approve', (c) => handleDeviceAction(c.req.raw, auth, publicOrigin));
+      app.post('/api/device/deny', (c) => handleDeviceAction(c.req.raw, auth, publicOrigin));
+    });
+  },
+};
+
+export default {
+  rootDir: '.',
+  pages: 'dist/pages',
+  api: 'dist/api',
+  public: 'public',
+  out: 'out',
+  host: '127.0.0.1',
+  port: Number(process.env.PORT ?? 3000),
+  // Consulted only for the login/logout same-origin checks (and any future
+  // authenticated mutations). `undefined` keeps the request-origin fallback.
+  publicOrigin,
+  // Global API authorization: default-deny. Only a request with a session is
+  // allowed; `/api/me` is the protected filesystem API, while login/logout are
+  // trusted hook routes that never pass through this check.
+  authorize: (context) => context.session !== null,
+  // Trusted session seam: derive the JSails session from the Better Auth cookie.
+  resolveSession: (request) => resolveSessionFromRequest(auth, request),
+  extensions: [
+    authExtension,
+    // No signing key is hardcoded. In development/test the extension mints an
+    // ephemeral key; a plain `jsails serve` outside those environments requires
+    // JSAILS_COMPONENT_SECRET (>= 32 bytes) or the live render fails closed.
+    serverComponents({ components: { 'task-list': taskList } }),
+  ],
+};

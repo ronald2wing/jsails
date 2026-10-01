@@ -1,0 +1,184 @@
+/**
+ * Better Auth wiring for the starter.
+ *
+ * `createAuth()` builds a Better Auth instance backed by a SQLite file through
+ * Kysely + better-sqlite3, and memoizes it: the app config, the `auth/routes`
+ * login/logout handlers, and the `scripts/*.mjs` helpers all share one instance
+ * (and therefore one database connection).
+ *
+ * JSails never auto-loads a `.env` file. The variables below are read directly
+ * from `process.env`; export them in the process environment (shell, ONCE,
+ * systemd) before starting the app. See `.env.auth.example`.
+ */
+
+import { createHmac } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+
+import Database from 'better-sqlite3';
+import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins/bearer';
+import { deviceAuthorization } from 'better-auth/plugins/device-authorization';
+import { Kysely, SqliteDialect } from 'kysely';
+
+import type { BetterAuthOptions } from 'better-auth';
+import type { Session } from 'jsails';
+
+/** The Better Auth instance type. */
+type Auth = ReturnType<typeof betterAuth>;
+
+/** Default SQLite database file, relative to the app's working directory. */
+const DEFAULT_DATABASE_FILE = 'storage/auth.sqlite';
+
+/** Default public base URL Better Auth uses to build callback URLs. */
+const DEFAULT_BASE_URL = 'http://localhost:3000';
+
+/**
+ * RFC 8628 client id the CLI uses (`auth/cli-client.ts`). The device
+ * authorization plugin's `validateClient` allowlists only this id, so no other
+ * client can request device codes or redeem device tokens.
+ */
+const CLI_CLIENT_ID = 'jsails-cli';
+
+/** The Better Auth signing secret, or `undefined` when unset. */
+function authSecret(): string | undefined {
+  return process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET;
+}
+
+let cachedAuth: Auth | undefined;
+
+/**
+ * Build (once) and return the shared Better Auth instance.
+ *
+ * - `AUTH_DATABASE_FILE` — SQLite path, default `storage/auth.sqlite`; the
+ *   parent directory is created automatically (`better-sqlite3` creates the
+ *   file but not its parents).
+ * - `BETTER_AUTH_SECRET` / `AUTH_SECRET` — passed straight through. Better Auth
+ *   itself fails in production without a secret; JSails does not invent a
+ *   fallback.
+ * - `BETTER_AUTH_URL` — public base URL, default `http://localhost:3000`.
+ */
+export function createAuth(): Auth {
+  if (cachedAuth !== undefined) {
+    return cachedAuth;
+  }
+
+  const databaseFile = process.env.AUTH_DATABASE_FILE ?? DEFAULT_DATABASE_FILE;
+  const databasePath = resolve(process.cwd(), databaseFile);
+  mkdirSync(dirname(databasePath), { recursive: true });
+
+  const sqlite = new Database(databasePath);
+  const db = new Kysely({ dialect: new SqliteDialect({ database: sqlite }) });
+
+  // Annotate with the library's options type instead of letting the options be
+  // inferred as a narrowed literal. `betterAuth` is generic in its options and
+  // `Auth<O>` is invariant in `O`, so an inferred literal yields
+  // `Auth<{ ...narrowed... }>`, which does not assign to the
+  // `ReturnType<typeof betterAuth>` (i.e. `Auth<BetterAuthOptions>`) declared
+  // for the memoized instance.
+  const options: BetterAuthOptions = {
+    // The database option MUST wrap the Kysely instance with `type: 'sqlite'`;
+    // a bare Kysely instance is rejected by Better Auth.
+    database: { db, type: 'sqlite' },
+    emailAndPassword: { enabled: true },
+    secret: authSecret(),
+    baseURL: process.env.BETTER_AUTH_URL ?? DEFAULT_BASE_URL,
+    plugins: [
+      // Device authorization (RFC 8628) powers `jsails login`: the CLI requests
+      // a device/user code, the user approves it on `/device`, and the CLI polls
+      // `/api/auth/device/token` for a session token. `validateClient` restricts
+      // both endpoints to the known CLI client id.
+      deviceAuthorization({
+        validateClient: (clientId) => clientId === CLI_CLIENT_ID,
+      }),
+      // `bearer` maps an `Authorization: Bearer <session-token>` header onto the
+      // session cookie, so CLI requests (`jsails whoami` → `/api/me`) reach
+      // `resolveSessionFromRequest` through the same seam as browser cookies.
+      bearer(),
+    ],
+  };
+
+  cachedAuth = betterAuth(options);
+
+  return cachedAuth;
+}
+
+/**
+ * Typed view of the device-flow endpoints registered by the device
+ * authorization plugin.
+ *
+ * `betterAuth` is annotated with `BetterAuthOptions` (see `createAuth`), so
+ * `auth.api` types only the built-in endpoints; the plugin registers its
+ * endpoints at runtime but they are not reflected in `Auth<BetterAuthOptions>`.
+ * {@link deviceApi} restores the checked types for the three endpoints the
+ * starter calls, in one place rather than a cast at each call site.
+ */
+export interface DeviceApi {
+  deviceVerify(input: {
+    query: { user_code: string };
+    headers: HeadersInit;
+  }): Promise<{ user_code: string; status: string; client_id?: string; scope?: string }>;
+  deviceApprove(input: { body: { userCode: string }; headers: HeadersInit }): Promise<{
+    success: boolean;
+  }>;
+  deviceDeny(input: { body: { userCode: string }; headers: HeadersInit }): Promise<{
+    success: boolean;
+  }>;
+}
+
+/** Access the device-flow endpoints with checked types (see {@link DeviceApi}). */
+export function deviceApi(auth: Auth): DeviceApi {
+  return auth.api as unknown as DeviceApi;
+}
+
+/** Purpose-separated message for the per-session CSRF token. */
+const SESSION_CSRF_MESSAGE_PREFIX = 'jsails.session.csrf:';
+
+/**
+ * Derive the JSails CSRF token for a Better Auth session id.
+ *
+ * Keyed by the signing secret when one is configured. Without a secret the token
+ * is a stable, deterministic value with no cryptographic binding: it keeps a
+ * session consistent across requests within a process but offers no CSRF
+ * protection. That is acceptable in the starter because there are no
+ * authenticated filesystem mutations (`/api/me` is a GET; login and logout are
+ * trusted hook routes that own their own origin checks).
+ */
+function deriveCsrfToken(sessionId: string, secret: string | undefined): string {
+  if (secret === undefined || secret === '') {
+    return `csrf:${sessionId}`;
+  }
+  return createHmac('sha256', secret)
+    .update(`${SESSION_CSRF_MESSAGE_PREFIX}${sessionId}`)
+    .digest('base64url');
+}
+
+/**
+ * Map a Better Auth session (read from the request cookie) to the JSails
+ * {@link Session} shape, or `null` when the request is unauthenticated.
+ */
+export async function resolveSessionFromRequest(
+  auth: Auth,
+  request: Request,
+): Promise<Session | null> {
+  const result = await auth.api.getSession({ headers: request.headers });
+  if (result === null) {
+    return null;
+  }
+
+  const { session, user } = result;
+  return {
+    id: session.id,
+    csrfToken: deriveCsrfToken(session.id, authSecret()),
+    data: {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    },
+    // Better Auth types this field as `Date`, but the API serializes it as an
+    // ISO string; `new Date(...)` normalizes both to an epoch-millisecond number.
+    expiresAt: new Date(session.expiresAt).getTime(),
+  };
+}

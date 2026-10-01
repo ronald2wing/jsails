@@ -1,0 +1,58 @@
+// Create a user in the Better Auth database.
+//
+// Usage: node scripts/create-user.mjs <email> <password> [name]
+//
+// The password is read from the arguments but is never printed or logged. It
+// requires the compiled auth module (`dist/auth/better-auth.js`) and the same
+// environment the app uses, and it runs the Better Auth `signUpEmail` endpoint
+// directly (no HTTP server involved).
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const compiledAuth = resolve(projectRoot, 'dist', 'auth', 'better-auth.js');
+
+const [email, password, name] = process.argv.slice(2);
+
+if (!email || !password) {
+  console.error('Usage: node scripts/create-user.mjs <email> <password> [name]');
+  process.exit(1);
+}
+
+// Minimal, readable validation. Better Auth performs the authoritative checks
+// (email shape, password policy) on sign-up; these only catch obviously wrong
+// invocations before doing any work.
+if (!email.includes('@')) {
+  console.error(`Error: <email> must be an email address (got "${email}").`);
+  process.exit(1);
+}
+
+if (!existsSync(compiledAuth)) {
+  console.error(
+    `Missing build output: ${compiledAuth} does not exist.\n` +
+      'Run "npm run build" first (tsc -p tsconfig.json compiles auth/better-auth.ts).',
+  );
+  process.exit(1);
+}
+
+const { createAuth } = await import(compiledAuth);
+
+const auth = createAuth();
+
+// Better Auth requires a name on sign-up; derive one from the email's local
+// part when the caller did not supply one.
+const displayName = name || email.split('@')[0] || 'User';
+
+try {
+  const result = await auth.api.signUpEmail({
+    body: { name: displayName, email, password },
+  });
+  console.log(`Created user: ${result.user.email} (id: ${result.user.id})`);
+} catch (error) {
+  // The password is never echoed. Better Auth error messages describe the
+  // failure (e.g. "user already exists") without credentials.
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Failed to create user "${email}": ${message}`);
+  process.exit(1);
+}

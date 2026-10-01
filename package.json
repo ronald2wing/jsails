@@ -1,0 +1,109 @@
+{
+  "name": "jsails",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeORM-based data layer (Active Record) with postgres/mysql adapters",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./api": {
+      "types": "./dist/src/api/index.d.ts",
+      "import": "./dist/src/api/index.js"
+    },
+    "./broadcast/client": {
+      "types": "./dist/src/broadcast/client.d.ts",
+      "import": "./dist/src/broadcast/client.js"
+    },
+    "./client": {
+      "types": "./dist/src/client/index.d.ts",
+      "import": "./dist/src/client/index.js"
+    },
+    "./extensions": {
+      "types": "./dist/src/extensions/index.d.ts",
+      "import": "./dist/src/extensions/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/src/render/jsx-runtime.d.ts",
+      "import": "./dist/src/render/jsx-runtime.js"
+    },
+    "./render-to-string": {
+      "types": "./dist/src/render/render-to-string.d.ts",
+      "import": "./dist/src/render/render-to-string.js"
+    },
+    "./server-components": {
+      "types": "./dist/src/server-components/index.d.ts",
+      "import": "./dist/src/server-components/index.js"
+    },
+    "./testing": {
+      "types": "./dist/src/testing/index.d.ts",
+      "import": "./dist/src/testing/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "templates/starter",
+    "AGENTS.md"
+  ],
+  "bin": {
+    "jsails": "./dist/src/cli.js"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build && node scripts/run-tests.mjs",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "build:watch": "tsc -p tsconfig.json --watch",
+    "typecheck:watch": "tsc -p tsconfig.json --noEmit --watch",
+    "pretest:watch": "tsc -p tsconfig.json",
+    "test:watch": "node scripts/run-tests.mjs --watch",
+    "test:coverage": "npm run build && node scripts/run-tests.mjs --experimental-test-coverage",
+    "verify:starter": "node scripts/verify-starter.mjs",
+    "verify:integrations": "node scripts/verify-integrations.mjs"
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.11.0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.3",
+    "@hotwired/turbo": "^8.0.23",
+    "@preact/preset-vite": "^2.10.6",
+    "@preact/signals": "^2.11.3",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "bullmq": "^6.3.11",
+    "hono": "^4.13.12",
+    "ioredis": "^5.11.1",
+    "mysql2": "^3.24.5",
+    "nodemon": "^3.1.14",
+    "pg": "^8.23.1",
+    "preact": "^11.0.0",
+    "preact-render-to-string": "^6.8.0",
+    "reflect-metadata": "^0.2.2",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4",
+    "sql.js": "^1.14.2",
+    "typeorm": "^1.1.1",
+    "vite": "^8.3.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/hotwired__turbo": "^8.0.16",
+    "@types/node": "^26.6.3",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "playwright-core": "^1.63.0",
+    "prettier": "^3.9.9",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.71.0"
+  }
+}
